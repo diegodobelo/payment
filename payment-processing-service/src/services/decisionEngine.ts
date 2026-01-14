@@ -1,4 +1,3 @@
-import { config } from '../config/index.js';
 import type { Issue, Customer, Transaction } from '../db/schema/index.js';
 import type { DecisionType } from '../db/schema/enums.js';
 import type {
@@ -20,7 +19,7 @@ export interface Decision {
 /**
  * Evaluate a decline issue (insufficient funds, expired card, etc.).
  */
-export function evaluateDecline(
+function evaluateDecline(
   issue: Issue,
   customer: Customer,
   transaction: Transaction
@@ -135,7 +134,7 @@ function evaluateDeclineGeneric(
 /**
  * Evaluate a missed installment issue.
  */
-export function evaluateMissedInstallment(
+function evaluateMissedInstallment(
   issue: Issue,
   customer: Customer
 ): Decision {
@@ -180,7 +179,7 @@ export function evaluateMissedInstallment(
 /**
  * Evaluate a dispute issue.
  */
-export function evaluateDispute(
+function evaluateDispute(
   issue: Issue,
   transaction: Transaction
 ): Decision {
@@ -292,7 +291,7 @@ function evaluateDisputeProductIssue(details: DisputeDetails): Decision {
 /**
  * Evaluate a refund request.
  */
-export function evaluateRefundRequest(
+function evaluateRefundRequest(
   issue: Issue,
   transaction: Transaction
 ): Decision {
@@ -398,18 +397,6 @@ export function evaluate(
         reason: `Unknown issue type: ${issue.type}`,
       };
   }
-}
-
-/**
- * Check if a decision should be auto-resolved based on confidence threshold.
- */
-export function shouldAutoResolve(decision: Decision): boolean {
-  // Never auto-resolve escalations
-  if (decision.decision === 'escalate') {
-    return false;
-  }
-
-  return decision.confidence >= config.confidenceThreshold;
 }
 
 /**

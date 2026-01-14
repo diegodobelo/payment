@@ -36,7 +36,7 @@ export const issueQueue = new Queue<ProcessIssueJobData>(QUEUE_NAME, {
 });
 
 // Queue events for monitoring
-export const queueEvents = new QueueEvents(QUEUE_NAME, { connection });
+const queueEvents = new QueueEvents(QUEUE_NAME, { connection });
 
 queueEvents.on('completed', ({ jobId }) => {
   logger.info({ jobId }, 'Job completed');
@@ -79,26 +79,6 @@ export async function enqueueIssue(
   logger.info({ issueId, jobId: job.id }, 'Issue enqueued for processing');
 
   return job.id ?? issueId;
-}
-
-/**
- * Get queue statistics.
- */
-export async function getQueueStats(): Promise<{
-  waiting: number;
-  active: number;
-  completed: number;
-  failed: number;
-  delayed: number;
-}> {
-  const counts = await issueQueue.getJobCounts();
-  return {
-    waiting: counts['waiting'] ?? 0,
-    active: counts['active'] ?? 0,
-    completed: counts['completed'] ?? 0,
-    failed: counts['failed'] ?? 0,
-    delayed: counts['delayed'] ?? 0,
-  };
 }
 
 /**

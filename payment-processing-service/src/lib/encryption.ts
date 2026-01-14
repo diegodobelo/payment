@@ -54,16 +54,3 @@ export function decrypt(encryptedData: string): string {
   return decrypted;
 }
 
-/**
- * Check if a string appears to be encrypted (has the expected format)
- */
-export function isEncrypted(value: string): boolean {
-  const parts = value.split(':');
-  if (parts.length !== 3) return false;
-
-  const [ivHex, authTagHex] = parts as [string, string, string];
-
-  // IV should be 12 bytes = 24 hex chars
-  // AuthTag should be 16 bytes = 32 hex chars
-  return ivHex.length === 24 && authTagHex.length === 32;
-}

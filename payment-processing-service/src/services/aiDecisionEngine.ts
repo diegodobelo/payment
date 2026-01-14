@@ -134,24 +134,6 @@ function parseAIResponse(response: string): AIDecision {
 }
 
 /**
- * Map AI decision to routing status.
- */
-export function mapDecisionToStatus(
-  aiDecision: AIDecision
-): 'resolved' | 'awaiting_review' | 'failed' {
-  const { confidence } = aiDecision;
-  const { autoResolveThreshold, humanReviewThreshold } = config.decisionEngine;
-
-  if (confidence >= autoResolveThreshold) {
-    return 'resolved';
-  } else if (confidence >= humanReviewThreshold) {
-    return 'awaiting_review';
-  } else {
-    return 'awaiting_review'; // Low confidence also goes to human review
-  }
-}
-
-/**
  * Evaluate an issue using the AI decision engine.
  */
 export async function evaluateWithAI(
@@ -258,8 +240,3 @@ Analyze this issue and provide your decision in the specified JSON format.`;
     throw error;
   }
 }
-
-export const aiDecisionEngine = {
-  evaluateWithAI,
-  mapDecisionToStatus,
-};

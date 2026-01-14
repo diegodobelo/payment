@@ -39,18 +39,4 @@ export const logger = pino({
   },
 });
 
-/**
- * Create a child logger with request context
- */
-export function createRequestLogger(requestId: string): pino.Logger {
-  return logger.child({ requestId });
-}
-
-/**
- * Create a child logger for queue workers
- */
-export function createWorkerLogger(workerId: string): pino.Logger {
-  return logger.child({ workerId, component: 'worker' });
-}
-
 export type Logger = pino.Logger;

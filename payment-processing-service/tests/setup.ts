@@ -4,19 +4,44 @@ import { db, closeDatabase } from '../src/db/client.js';
 import { redis, closeRedis } from '../src/lib/redis.js';
 import { issueQueue, closeQueue } from '../src/queue/queueManager.js';
 
-// Mock the Claude Agent SDK globally to prevent API calls during tests
+// Default AI response for backward compatibility
+const defaultAIResponse = {
+  type: 'result' as const,
+  result: JSON.stringify({
+    decision: 'auto_resolve',
+    action: 'approve_retry',
+    confidence: 85,
+    reasoning: 'Mocked AI response for testing',
+    policyApplied: 'test_policy',
+  }),
+};
+
+// Configurable mock response - can be overridden per test
+let mockResponse: { type: string; result?: string; error?: Error } | null = null;
+
+/**
+ * Set a custom AI SDK response for the next test.
+ * Call with null to reset to default behavior.
+ */
+export function setMockAIResponse(response: { type: string; result?: string; error?: Error } | null): void {
+  mockResponse = response;
+}
+
+/**
+ * Reset mock to default response.
+ */
+export function resetMockAIResponse(): void {
+  mockResponse = null;
+}
+
+// Mock the Claude Agent SDK globally with configurable responses
 vi.mock('@anthropic-ai/claude-agent-sdk', () => ({
   query: vi.fn(async function* () {
-    yield {
-      type: 'result',
-      result: JSON.stringify({
-        decision: 'auto_resolve',
-        action: 'approve_retry',
-        confidence: 85,
-        reasoning: 'Mocked AI response for testing',
-        policyApplied: 'test_policy',
-      }),
-    };
+    const response = mockResponse ?? defaultAIResponse;
+    if (response.error) {
+      throw response.error;
+    }
+    yield response;
   }),
 }));
 

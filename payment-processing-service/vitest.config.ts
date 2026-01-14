@@ -13,5 +13,9 @@ export default defineConfig({
     sequence: {
       concurrent: false,
     },
+    // Use rules engine in tests (not AI) so we test actual decision logic
+    env: {
+      DECISION_ENGINE_MODE: 'rules',
+    },
   },
 });

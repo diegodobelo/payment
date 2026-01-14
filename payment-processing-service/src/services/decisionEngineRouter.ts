@@ -103,9 +103,3 @@ export function shouldAutoResolve(decision: UnifiedDecision): boolean {
 export function getResolution(decision: UnifiedDecision): string {
   return decisionToResolution(decision.decision);
 }
-
-export const decisionEngineRouter = {
-  evaluate,
-  shouldAutoResolve,
-  getResolution,
-};

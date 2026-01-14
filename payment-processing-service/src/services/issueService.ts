@@ -252,8 +252,3 @@ export async function processIssue(
     await releaseLock(issueId, workerId);
   }
 }
-
-export const issueService = {
-  processIssue,
-  NonRetryableError,
-};

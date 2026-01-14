@@ -17,8 +17,7 @@
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
     "db:studio": "drizzle-kit studio",
-    "lint": "eslint src --ext .ts",
-    "typecheck": "tsc --noEmit",
+        "typecheck": "tsc --noEmit",
     "process-samples": "tsx scripts/process-sample-issues.ts",
     "ingest-samples": "tsx scripts/ingest-sample-issues.ts"
   },
@@ -48,11 +47,11 @@
     "pino": "^10.1.1",
     "pino-pretty": "^13.1.3",
     "postgres": "^3.4.8",
-    "prom-client": "^15.1.3",
     "zod": "^4.3.5"
   },
   "devDependencies": {
     "@types/node": "^25.0.7",
+    "@vitest/coverage-v8": "^4.0.17",
     "drizzle-kit": "^0.31.8",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",

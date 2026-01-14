@@ -14,8 +14,8 @@ import {
   ConflictError,
   UnprocessableError,
   ValidationError,
-} from '../middleware/index.js';
-import { issueRepository } from '../../repositories/index.js';
+} from '../middleware/errorHandler.js';
+import { issueRepository } from '../../repositories/issueRepository.js';
 import { customerRepository } from '../../repositories/customerRepository.js';
 import { transactionRepository } from '../../repositories/transactionRepository.js';
 import { statusHistoryRepository } from '../../repositories/statusHistoryRepository.js';

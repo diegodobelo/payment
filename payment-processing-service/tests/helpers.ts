@@ -8,6 +8,62 @@ import { requestIdHook } from '../src/api/middleware/requestId.js';
 import { healthRoutes } from '../src/api/routes/health.routes.js';
 import { issueRoutes } from '../src/api/routes/issues.routes.js';
 
+// AI Mock Response Types
+export interface AIResponseData {
+  decision: 'auto_resolve' | 'human_review' | 'escalate';
+  action: 'approve_retry' | 'approve_refund' | 'reject' | 'escalate';
+  confidence: number;
+  reasoning?: string;
+  policyApplied?: string;
+}
+
+/**
+ * Create a mock AI SDK response with customizable fields.
+ */
+export function createMockAIResponse(overrides?: Partial<AIResponseData>): {
+  type: string;
+  result: string;
+} {
+  const defaultData: AIResponseData = {
+    decision: 'auto_resolve',
+    action: 'approve_retry',
+    confidence: 85,
+    reasoning: 'Test AI reasoning',
+    policyApplied: 'test_policy',
+  };
+
+  return {
+    type: 'result',
+    result: JSON.stringify({ ...defaultData, ...overrides }),
+  };
+}
+
+/**
+ * Create a mock AI SDK response with raw result string (for testing parsing).
+ */
+export function createMockAIResponseRaw(resultString: string): {
+  type: string;
+  result: string;
+} {
+  return {
+    type: 'result',
+    result: resultString,
+  };
+}
+
+/**
+ * Create a mock AI SDK error response.
+ */
+export function createMockAIError(message: string): {
+  type: string;
+  error: Error;
+} {
+  return {
+    type: 'result',
+    error: new Error(message),
+  };
+}
+
 /**
  * Build a test Fastify app with all routes registered.
  */

@@ -29,6 +29,12 @@ npm run db:studio     # Open Drizzle Studio GUI
 
 # Infrastructure (PostgreSQL + Redis)
 docker-compose up -d
+
+# Demo & Ingestion Scripts
+npm run process-samples           # Demo in-memory processing (no DB changes)
+npm run ingest-samples            # Full pipeline demo via API
+npm run ingest-samples -- -c      # Clear database first, then run
+npm run ingest-samples -- --clear # Same as -c
 ```
 
 ## Architecture Overview
@@ -62,6 +68,10 @@ src/
 
 **Issue Status Flow**: `pending` → `processing` → `resolved` | `awaiting_review` | `failed`
 
+**Decision Engine Modes** (set via `DECISION_ENGINE_MODE` in `.env`):
+- `rules`: Rule-based decision engine (no API calls)
+- `ai`: AI-powered decisions using Claude Agent SDK
+
 ### Data Layer Patterns
 
 - **PII Encryption**: Customer email/name and payment methods are encrypted with AES-256-GCM at the application level. Use repository methods that handle encryption/decryption.
@@ -86,3 +96,19 @@ if (shouldResolve) params.resolvedAt = new Date();
 Requires `ENCRYPTION_KEY` (64 hex chars). Generate with: `openssl rand -hex 32`
 
 Configuration is validated at startup via Zod in `src/config/index.ts`. Invalid config causes immediate exit.
+
+### Testing
+
+- Tests use Vitest with a global mock for the Claude Agent SDK (`tests/setup.ts`)
+- The mock prevents API calls during tests while simulating AI responses
+- Run `npm test` for watch mode or `npm run test:run` for single run
+
+### Running the Full Pipeline
+
+1. Start infrastructure: `docker-compose up -d`
+2. Run migrations: `npm run db:migrate`
+3. Start API server: `npm run dev`
+4. Start worker (separate terminal): `npm run worker:dev`
+5. Run ingestion: `npm run ingest-samples -- -c`
+
+Note: If you change `DECISION_ENGINE_MODE` in `.env`, restart the worker process.

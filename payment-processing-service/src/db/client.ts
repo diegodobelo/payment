@@ -18,9 +18,6 @@ const client = postgres(connectionString, {
 // Create drizzle instance with schema
 export const db = drizzle(client, { schema });
 
-// Export the raw client for migrations
-export const sql = client;
-
 /**
  * Close the database connection
  */
@@ -42,5 +39,3 @@ export async function testConnection(): Promise<boolean> {
     return false;
   }
 }
-
-export type Database = typeof db;

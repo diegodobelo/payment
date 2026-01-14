@@ -67,8 +67,3 @@ export async function logPiiAccess(params: {
 
   await createAuditLog(auditParams);
 }
-
-export const auditLogRepository = {
-  create: createAuditLog,
-  logPiiAccess,
-};
