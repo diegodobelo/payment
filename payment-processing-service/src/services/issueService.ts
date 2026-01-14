@@ -194,21 +194,24 @@ export async function processIssue(
 
     // Determine if we should mark as failed or leave for retry
     if (error instanceof NonRetryableError) {
-      // Non-retryable - mark as failed
-      await issueRepository.updateStatus(issueId, 'failed', audit);
-      await statusHistoryRepository.create({
-        issueId,
-        fromStatus: 'processing',
-        toStatus: 'failed',
-        changedBy: workerId,
-        reason: `Non-retryable error: ${error.message}`,
-      });
+      // Only update status if the issue exists (not for "Issue not found" errors)
+      const errorMessage = error.message;
+      if (!errorMessage.includes('not found')) {
+        await issueRepository.updateStatus(issueId, 'failed', audit);
+        await statusHistoryRepository.create({
+          issueId,
+          fromStatus: 'processing',
+          toStatus: 'failed',
+          changedBy: workerId,
+          reason: `Non-retryable error: ${errorMessage}`,
+        });
+      }
 
       return {
         success: false,
         issueId,
         status: 'failed',
-        error: error.message,
+        error: errorMessage,
       };
     }
 
