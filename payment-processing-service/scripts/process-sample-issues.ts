@@ -295,16 +295,16 @@ async function processIssues() {
 
   // Header
   console.log(
-    '| Issue ID  | Type               | Decision      | Confidence | Routing       |'
+    '| Issue ID           | Type               | Decision      | Confidence | Routing       |'
   );
   console.log(
-    '|-----------|--------------------|--------------:|:----------:|---------------|'
+    '|--------------------|--------------------|--------------:|:----------:|---------------|'
   );
 
   // Rows
   for (const r of results) {
     console.log(
-      `| ${r.issueId.padEnd(9)} | ${r.type.padEnd(18)} | ${r.decision.padStart(12)} | ${r.confidence.padStart(10)} | ${r.routing.padEnd(13)} |`
+      `| ${r.issueId.padEnd(18)} | ${r.type.padEnd(18)} | ${r.decision.padStart(12)} | ${r.confidence.padStart(10)} | ${r.routing.padEnd(13)} |`
     );
   }
 

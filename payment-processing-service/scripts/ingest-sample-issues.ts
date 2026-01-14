@@ -33,8 +33,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Configuration
 const API_BASE_URL = `http://localhost:${config.port}`;
-const POLL_INTERVAL_MS = 500;
-const MAX_POLL_TIME_MS = 30000;
+const POLL_INTERVAL_MS = 2000;  // Poll every 2 seconds
+const MAX_POLL_TIME_MS = 120000; // Wait up to 2 minutes
 
 // Types for raw sample data
 interface RawCustomer {
@@ -524,13 +524,13 @@ async function main(): Promise<void> {
   }
 
   // Display results
-  console.log('\n╔══════════════════════════════════════════════════════════════╗');
-  console.log('║                     Processing Results                        ║');
-  console.log('╚══════════════════════════════════════════════════════════════╝\n');
+  console.log('\n╔═══════════════════════════════════════════════════════════════════════════╗');
+  console.log('║                           Processing Results                              ║');
+  console.log('╚═══════════════════════════════════════════════════════════════════════════╝\n');
 
-  console.log('┌───────────┬────────────────────┬───────────────┬────────────┬───────────────┐');
-  console.log('│ Issue ID  │ Type               │ Decision      │ Confidence │ Routing       │');
-  console.log('├───────────┼────────────────────┼───────────────┼────────────┼───────────────┤');
+  console.log('┌────────────────────┬────────────────────┬───────────────┬────────────┬───────────────┐');
+  console.log('│ Issue ID           │ Type               │ Decision      │ Confidence │ Routing       │');
+  console.log('├────────────────────┼────────────────────┼───────────────┼────────────┼───────────────┤');
 
   for (const r of results) {
     const decision = r.automated_decision?.decision ?? 'N/A';
@@ -543,11 +543,11 @@ async function main(): Promise<void> {
     );
 
     console.log(
-      `│ ${r.external_id.padEnd(9)} │ ${r.type.padEnd(18)} │ ${decision.padStart(13)} │ ${confidence.padStart(10)} │ ${routing.padEnd(13)} │`
+      `│ ${r.external_id.padEnd(18)} │ ${r.type.padEnd(18)} │ ${decision.padStart(13)} │ ${confidence.padStart(10)} │ ${routing.padEnd(13)} │`
     );
   }
 
-  console.log('└───────────┴────────────────────┴───────────────┴────────────┴───────────────┘');
+  console.log('└────────────────────┴────────────────────┴───────────────┴────────────┴───────────────┘');
 
   // Summary
   const autoResolved = results.filter((r) => r.status === 'resolved').length;

@@ -41,7 +41,7 @@ export async function createAIDecision(
     aiAction: params.aiAction,
     aiConfidence: params.aiConfidence.toString(),
     aiReasoning: params.aiReasoning,
-    aiPolicyApplied: params.aiPolicyApplied ?? null,
+    aiPolicyApplied: params.aiPolicyApplied?.slice(0, 255) ?? null,
   };
 
   const result = await db.insert(decisionAnalytics).values(record).returning();
