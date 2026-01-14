@@ -300,15 +300,35 @@ export async function reviewIssue(
   // Determine final resolution based on decision
   let finalResolution: string;
   switch (body.decision) {
-    case 'approve_retry':
-      finalResolution = 'approved_for_retry';
+    // Decline actions
+    case 'retry_payment':
+      finalResolution = 'payment_retry_scheduled';
       break;
+    case 'block_card':
+      finalResolution = 'card_blocked';
+      break;
+    // Refund request actions
     case 'approve_refund':
-      finalResolution = 'refunded';
+      finalResolution = 'refund_approved';
       break;
-    case 'reject':
-      finalResolution = 'rejected';
+    case 'deny_refund':
+      finalResolution = 'refund_denied';
       break;
+    // Dispute actions
+    case 'accept_dispute':
+      finalResolution = 'dispute_accepted';
+      break;
+    case 'contest_dispute':
+      finalResolution = 'dispute_contested';
+      break;
+    // Missed installment actions
+    case 'send_reminder':
+      finalResolution = 'reminder_sent';
+      break;
+    case 'charge_late_fee':
+      finalResolution = 'late_fee_charged';
+      break;
+    // Common
     case 'escalate':
       finalResolution = 'escalated';
       break;
@@ -350,9 +370,10 @@ export async function reviewIssue(
   if (issue.automatedDecision) {
     // Determine if human agreed with AI
     let humanDecision: 'approve' | 'reject' | 'modify';
+    const rejectionActions = ['block_card', 'deny_refund', 'contest_dispute', 'charge_late_fee', 'escalate'];
     if (body.decision === issue.automatedDecision) {
       humanDecision = 'approve';
-    } else if (body.decision === 'reject' || body.decision === 'escalate') {
+    } else if (rejectionActions.includes(body.decision)) {
       humanDecision = 'reject';
     } else {
       humanDecision = 'modify';

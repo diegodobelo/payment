@@ -66,7 +66,7 @@ Return ONLY valid JSON with no additional text:
 ```json
 {
   "decision": "auto_resolve" | "human_review" | "escalate",
-  "action": "approve_retry" | "reject" | "escalate",
+  "action": "retry_payment" | "block_card" | "escalate",
   "confidence": <0-100>,
   "reasoning": "<detailed explanation of why this decision was made>",
   "policyApplied": "<which specific policy rule was applied>"

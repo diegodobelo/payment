@@ -65,7 +65,7 @@ describe('AI Decision Engine', () => {
     it('should parse auto_resolve decision correctly', async () => {
       setMockAIResponse(createMockAIResponse({
         decision: 'auto_resolve',
-        action: 'approve_retry',
+        action: 'retry_payment',
         confidence: 95,
         reasoning: 'Test reasoning',
         policyApplied: 'test_policy',
@@ -75,7 +75,7 @@ describe('AI Decision Engine', () => {
       const result = await evaluateWithAI(issue, testCustomer, testTransaction);
 
       expect(result.decision).toBe('auto_resolve');
-      expect(result.action).toBe('approve_retry');
+      expect(result.action).toBe('retry_payment');
       expect(result.confidence).toBe(95);
       expect(result.reasoning).toBe('Test reasoning');
       expect(result.policyApplied).toBe('test_policy');
@@ -124,23 +124,23 @@ describe('AI Decision Engine', () => {
       expect(result.action).toBe('approve_refund');
     });
 
-    it('should handle reject action', async () => {
+    it('should handle block_card action', async () => {
       setMockAIResponse(createMockAIResponse({
         decision: 'auto_resolve',
-        action: 'reject',
+        action: 'block_card',
         confidence: 92,
       }));
 
       const issue = await createTestIssue();
       const result = await evaluateWithAI(issue, testCustomer, testTransaction);
 
-      expect(result.action).toBe('reject');
+      expect(result.action).toBe('block_card');
     });
 
     it('should handle JSON embedded in text', async () => {
       const jsonWithText = `Here is my analysis:
 
-        {"decision":"auto_resolve","action":"approve_retry","confidence":88,"reasoning":"Looks good","policyApplied":"test"}
+        {"decision":"auto_resolve","action":"retry_payment","confidence":88,"reasoning":"Looks good","policyApplied":"test"}
 
         Let me know if you need more details.`;
 
@@ -150,14 +150,14 @@ describe('AI Decision Engine', () => {
       const result = await evaluateWithAI(issue, testCustomer, testTransaction);
 
       expect(result.decision).toBe('auto_resolve');
-      expect(result.action).toBe('approve_retry');
+      expect(result.action).toBe('retry_payment');
       expect(result.confidence).toBe(88);
     });
 
     it('should preserve policyApplied field', async () => {
       setMockAIResponse(createMockAIResponse({
         decision: 'human_review',
-        action: 'approve_retry',
+        action: 'retry_payment',
         confidence: 70,
         policyApplied: 'decline-policy-v2',
       }));
@@ -172,7 +172,7 @@ describe('AI Decision Engine', () => {
   describe('AI Response Validation Errors', () => {
     it('should throw error when response missing decision field', async () => {
       setMockAIResponse(createMockAIResponseRaw(JSON.stringify({
-        action: 'approve_retry',
+        action: 'retry_payment',
         confidence: 85,
       })));
 
@@ -195,7 +195,7 @@ describe('AI Decision Engine', () => {
     it('should throw error when response missing confidence field', async () => {
       setMockAIResponse(createMockAIResponseRaw(JSON.stringify({
         decision: 'auto_resolve',
-        action: 'approve_retry',
+        action: 'retry_payment',
       })));
 
       const issue = await createTestIssue();
@@ -206,7 +206,7 @@ describe('AI Decision Engine', () => {
     it('should throw error for invalid decision value', async () => {
       setMockAIResponse(createMockAIResponseRaw(JSON.stringify({
         decision: 'invalid_decision',
-        action: 'approve_retry',
+        action: 'retry_payment',
         confidence: 85,
       })));
 
@@ -230,7 +230,7 @@ describe('AI Decision Engine', () => {
     it('should throw error for confidence < 0', async () => {
       setMockAIResponse(createMockAIResponseRaw(JSON.stringify({
         decision: 'auto_resolve',
-        action: 'approve_retry',
+        action: 'retry_payment',
         confidence: -10,
       })));
 
@@ -242,7 +242,7 @@ describe('AI Decision Engine', () => {
     it('should throw error for confidence > 100', async () => {
       setMockAIResponse(createMockAIResponseRaw(JSON.stringify({
         decision: 'auto_resolve',
-        action: 'approve_retry',
+        action: 'retry_payment',
         confidence: 150,
       })));
 
@@ -281,7 +281,7 @@ describe('AI Decision Engine', () => {
   describe('Decision Routing (shouldAutoResolve)', () => {
     it('should auto-resolve for auto_resolve routing with high confidence', () => {
       const decision = {
-        decision: 'approve_retry' as const,
+        decision: 'retry_payment' as const,
         confidence: 0.95,
         reason: 'test',
         source: 'ai' as const,
@@ -293,7 +293,7 @@ describe('AI Decision Engine', () => {
 
     it('should not auto-resolve for human_review routing', () => {
       const decision = {
-        decision: 'approve_retry' as const,
+        decision: 'retry_payment' as const,
         confidence: 0.95,
         reason: 'test',
         source: 'ai' as const,

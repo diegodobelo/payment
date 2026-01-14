@@ -114,7 +114,13 @@ function parseAIResponse(response: string): AIDecision {
   }
 
   // Validate action values
-  const validActions = ['approve_retry', 'approve_refund', 'reject', 'escalate'];
+  const validActions = [
+    'retry_payment', 'block_card',           // decline
+    'approve_refund', 'deny_refund',         // refund_request
+    'accept_dispute', 'contest_dispute',     // dispute
+    'send_reminder', 'charge_late_fee',      // missed_installment
+    'escalate',                              // common
+  ];
   if (!validActions.includes(parsed.action)) {
     throw new Error(`Invalid action value: ${parsed.action}`);
   }

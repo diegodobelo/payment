@@ -4,7 +4,13 @@ import { z } from 'zod';
 const issueTypeValues = ['decline', 'missed_installment', 'dispute', 'refund_request'] as const;
 const issueStatusValues = ['pending', 'processing', 'awaiting_review', 'resolved', 'failed'] as const;
 const priorityLevelValues = ['low', 'normal', 'high', 'critical'] as const;
-const decisionTypeValues = ['approve_retry', 'approve_refund', 'reject', 'escalate'] as const;
+const decisionTypeValues = [
+  'retry_payment', 'block_card',           // decline
+  'approve_refund', 'deny_refund',         // refund_request
+  'accept_dispute', 'contest_dispute',     // dispute
+  'send_reminder', 'charge_late_fee',      // missed_installment
+  'escalate',                              // common
+] as const;
 
 // Details schemas for each issue type
 const declineDetailsSchema = z.object({

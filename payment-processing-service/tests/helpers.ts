@@ -11,7 +11,8 @@ import { issueRoutes } from '../src/api/routes/issues.routes.js';
 // AI Mock Response Types
 export interface AIResponseData {
   decision: 'auto_resolve' | 'human_review' | 'escalate';
-  action: 'approve_retry' | 'approve_refund' | 'reject' | 'escalate';
+  action: 'retry_payment' | 'block_card' | 'approve_refund' | 'deny_refund' |
+          'accept_dispute' | 'contest_dispute' | 'send_reminder' | 'charge_late_fee' | 'escalate';
   confidence: number;
   reasoning?: string;
   policyApplied?: string;
@@ -26,7 +27,7 @@ export function createMockAIResponse(overrides?: Partial<AIResponseData>): {
 } {
   const defaultData: AIResponseData = {
     decision: 'auto_resolve',
-    action: 'approve_retry',
+    action: 'retry_payment',
     confidence: 85,
     reasoning: 'Test AI reasoning',
     policyApplied: 'test_policy',

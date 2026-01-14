@@ -52,7 +52,7 @@ function evaluateDeclineInsufficientFunds(customer: Customer): Decision {
   // Low-risk customer with good payment history → auto-retry
   if (customer.riskScore === 'low' && customer.successfulPayments > 5) {
     return {
-      decision: 'approve_retry',
+      decision: 'retry_payment',
       confidence: 0.85,
       reason: 'Low-risk customer with strong payment history - scheduling retry',
     };
@@ -61,7 +61,7 @@ function evaluateDeclineInsufficientFunds(customer: Customer): Decision {
   // Medium-risk customer with decent history
   if (customer.riskScore === 'medium' && customer.successfulPayments > 10) {
     return {
-      decision: 'approve_retry',
+      decision: 'retry_payment',
       confidence: 0.7,
       reason: 'Medium-risk customer with established payment history - scheduling retry',
     };
@@ -85,7 +85,7 @@ function evaluateDeclineExpiredCard(
   // Loyal recurring customer → approve retry (they'll update card)
   if (transaction.isRecurring && customer.lifetimeTransactions > 10) {
     return {
-      decision: 'approve_retry',
+      decision: 'retry_payment',
       confidence: 0.9,
       reason: 'Loyal subscription customer - notify to update payment method and retry',
     };
@@ -118,7 +118,7 @@ function evaluateDeclineGeneric(
   // Good customer → one more retry
   if (customer.riskScore === 'low') {
     return {
-      decision: 'approve_retry',
+      decision: 'retry_payment',
       confidence: 0.75,
       reason: 'Low-risk customer - attempting one more retry',
     };
@@ -141,10 +141,10 @@ function evaluateMissedInstallment(
   const details = issue.details as MissedInstallmentDetails;
   const { days_overdue } = details;
 
-  // Recently overdue, good customer → auto-retry
+  // Recently overdue, good customer → send reminder
   if (days_overdue <= 7 && customer.riskScore !== 'high') {
     return {
-      decision: 'approve_retry',
+      decision: 'send_reminder',
       confidence: 0.75,
       reason: 'Short overdue period for good customer - sending reminder and retrying',
     };
@@ -162,7 +162,7 @@ function evaluateMissedInstallment(
   // Middle ground (8-30 days)
   if (customer.riskScore === 'low' && days_overdue <= 14) {
     return {
-      decision: 'approve_retry',
+      decision: 'send_reminder',
       confidence: 0.65,
       reason: 'Low-risk customer with moderate overdue - scheduling retry with notification',
     };
@@ -212,10 +212,10 @@ function evaluateDisputeItemNotReceived(
   details: DisputeDetails,
   shipping: Transaction['shippingInfo']
 ): Decision {
-  // Tracking shows delivered → reject dispute
+  // Tracking shows delivered → contest dispute
   if (shipping?.status === 'delivered') {
     return {
-      decision: 'reject',
+      decision: 'contest_dispute',
       confidence: 0.95,
       reason: 'Carrier tracking confirms delivery - dispute denied',
     };
@@ -230,10 +230,10 @@ function evaluateDisputeItemNotReceived(
     };
   }
 
-  // No tracking or lost → approve refund
+  // No tracking or lost → accept dispute
   if (!shipping || shipping.status === 'lost') {
     return {
-      decision: 'approve_refund',
+      decision: 'accept_dispute',
       confidence: 0.85,
       reason: 'No delivery confirmation available - approving refund',
     };
@@ -274,7 +274,7 @@ function evaluateDisputeProductIssue(details: DisputeDetails): Decision {
   // Recent purchase with product issue → likely legitimate
   if (details.days_since_purchase <= 14) {
     return {
-      decision: 'approve_refund',
+      decision: 'accept_dispute',
       confidence: 0.75,
       reason: 'Recent product issue report - approving refund within return window',
     };
@@ -355,7 +355,7 @@ function evaluateRefundRequest(
     }
 
     return {
-      decision: 'reject',
+      decision: 'deny_refund',
       confidence: 0.8,
       reason: 'Outside 30-day return policy window',
     };
@@ -404,12 +404,27 @@ export function evaluate(
  */
 export function decisionToResolution(decision: DecisionType): string {
   switch (decision) {
-    case 'approve_retry':
-      return 'approved_for_retry';
+    // Decline actions
+    case 'retry_payment':
+      return 'payment_retry_scheduled';
+    case 'block_card':
+      return 'card_blocked';
+    // Refund request actions
     case 'approve_refund':
-      return 'refunded';
-    case 'reject':
-      return 'rejected';
+      return 'refund_approved';
+    case 'deny_refund':
+      return 'refund_denied';
+    // Dispute actions
+    case 'accept_dispute':
+      return 'dispute_accepted';
+    case 'contest_dispute':
+      return 'dispute_contested';
+    // Missed installment actions
+    case 'send_reminder':
+      return 'reminder_sent';
+    case 'charge_late_fee':
+      return 'late_fee_charged';
+    // Common
     case 'escalate':
       return 'escalated';
     default:

@@ -64,7 +64,12 @@ src/
 
 **Issue Types**: `decline`, `missed_installment`, `dispute`, `refund_request`
 
-**Decision Types**: `approve_retry`, `approve_refund`, `reject`, `escalate`
+**Decision Types** (semantic actions by issue type):
+- Decline: `retry_payment`, `block_card`
+- Refund Request: `approve_refund`, `deny_refund`
+- Dispute: `accept_dispute`, `contest_dispute`
+- Missed Installment: `send_reminder`, `charge_late_fee`
+- Common: `escalate`
 
 **Issue Status Flow**: `pending` → `processing` → `resolved` | `awaiting_review` | `failed`
 

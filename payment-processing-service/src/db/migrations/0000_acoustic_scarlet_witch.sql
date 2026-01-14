@@ -1,6 +1,6 @@
 CREATE TYPE "public"."audit_action" AS ENUM('create', 'update', 'delete', 'review', 'pii_access');--> statement-breakpoint
 CREATE TYPE "public"."audit_entity_type" AS ENUM('issue', 'customer', 'transaction');--> statement-breakpoint
-CREATE TYPE "public"."decision_type" AS ENUM('approve_retry', 'approve_refund', 'reject', 'escalate');--> statement-breakpoint
+CREATE TYPE "public"."decision_type" AS ENUM('retry_payment', 'block_card', 'approve_refund', 'deny_refund', 'accept_dispute', 'contest_dispute', 'send_reminder', 'charge_late_fee', 'escalate');--> statement-breakpoint
 CREATE TYPE "public"."issue_status" AS ENUM('pending', 'processing', 'awaiting_review', 'resolved', 'failed');--> statement-breakpoint
 CREATE TYPE "public"."issue_type" AS ENUM('decline', 'missed_installment', 'dispute', 'refund_request');--> statement-breakpoint
 CREATE TYPE "public"."priority_level" AS ENUM('low', 'normal', 'high', 'critical');--> statement-breakpoint
@@ -94,10 +94,28 @@ CREATE TABLE "audit_logs" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "decision_analytics" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"issue_id" uuid NOT NULL,
+	"ai_decision" varchar(50),
+	"ai_action" varchar(50),
+	"ai_confidence" numeric(5, 2),
+	"ai_reasoning" text,
+	"ai_policy_applied" varchar(255),
+	"human_decision" varchar(50),
+	"human_action" varchar(50),
+	"human_reason" text,
+	"agreement" varchar(50),
+	"reviewed_by" varchar(255),
+	"reviewed_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 ALTER TABLE "transactions" ADD CONSTRAINT "transactions_customer_id_customers_id_fk" FOREIGN KEY ("customer_id") REFERENCES "public"."customers"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "issues" ADD CONSTRAINT "issues_customer_id_customers_id_fk" FOREIGN KEY ("customer_id") REFERENCES "public"."customers"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "issues" ADD CONSTRAINT "issues_transaction_id_transactions_id_fk" FOREIGN KEY ("transaction_id") REFERENCES "public"."transactions"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "status_history" ADD CONSTRAINT "status_history_issue_id_issues_id_fk" FOREIGN KEY ("issue_id") REFERENCES "public"."issues"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "decision_analytics" ADD CONSTRAINT "decision_analytics_issue_id_issues_id_fk" FOREIGN KEY ("issue_id") REFERENCES "public"."issues"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "idx_customers_external" ON "customers" USING btree ("external_id");--> statement-breakpoint
 CREATE INDEX "idx_customers_risk" ON "customers" USING btree ("risk_score");--> statement-breakpoint
 CREATE INDEX "idx_transactions_external" ON "transactions" USING btree ("external_id");--> statement-breakpoint
@@ -114,4 +132,7 @@ CREATE INDEX "idx_history_issue" ON "status_history" USING btree ("issue_id","cr
 CREATE INDEX "idx_audit_entity" ON "audit_logs" USING btree ("entity_type","entity_id","created_at");--> statement-breakpoint
 CREATE INDEX "idx_audit_actor" ON "audit_logs" USING btree ("actor","created_at");--> statement-breakpoint
 CREATE INDEX "idx_audit_action" ON "audit_logs" USING btree ("action","created_at");--> statement-breakpoint
-CREATE INDEX "idx_audit_request" ON "audit_logs" USING btree ("request_id");
+CREATE INDEX "idx_audit_request" ON "audit_logs" USING btree ("request_id");--> statement-breakpoint
+CREATE INDEX "idx_analytics_issue" ON "decision_analytics" USING btree ("issue_id");--> statement-breakpoint
+CREATE INDEX "idx_analytics_agreement" ON "decision_analytics" USING btree ("agreement");--> statement-breakpoint
+CREATE INDEX "idx_analytics_reviewed_at" ON "decision_analytics" USING btree ("reviewed_at");

@@ -39,14 +39,14 @@ describe('Issue Processing', () => {
 
       expect(result.success).toBe(true);
       expect(result.status).toBe('resolved');
-      expect(result.decision?.decision).toBe('approve_retry');
+      expect(result.decision?.decision).toBe('retry_payment');
       expect(result.decision?.confidence).toBeGreaterThanOrEqual(0.8);
 
       // Verify database state
       const updated = await issueRepository.findById(issue!.id);
       expect(updated?.status).toBe('resolved');
-      expect(updated?.automatedDecision).toBe('approve_retry');
-      expect(updated?.finalResolution).toBe('approved_for_retry');
+      expect(updated?.automatedDecision).toBe('retry_payment');
+      expect(updated?.finalResolution).toBe('payment_retry_scheduled');
     });
   });
 
@@ -149,7 +149,7 @@ describe('Decision Engine - All Issue Types', () => {
     const result = await processIssue(issue!.id, { workerId: 'test-worker' });
 
     expect(result.success).toBe(true);
-    expect(result.decision?.decision).toBe('approve_retry');
+    expect(result.decision?.decision).toBe('send_reminder');
   });
 
   it('should process refund_request issue within return window', async () => {
@@ -188,6 +188,6 @@ describe('Decision Engine - All Issue Types', () => {
     const result = await processIssue(issue!.id, { workerId: 'test-worker' });
 
     expect(result.success).toBe(true);
-    expect(result.decision?.decision).toBe('reject');
+    expect(result.decision?.decision).toBe('deny_refund');
   });
 });

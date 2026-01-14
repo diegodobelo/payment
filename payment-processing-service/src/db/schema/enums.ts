@@ -25,11 +25,21 @@ export const priorityLevelEnum = pgEnum('priority_level', [
   'critical',
 ]);
 
-// Decision type enum
+// Decision type enum - semantic actions by issue type
 export const decisionTypeEnum = pgEnum('decision_type', [
-  'approve_retry',
+  // Decline actions
+  'retry_payment',
+  'block_card',
+  // Refund request actions
   'approve_refund',
-  'reject',
+  'deny_refund',
+  // Dispute actions
+  'accept_dispute',
+  'contest_dispute',
+  // Missed installment actions
+  'send_reminder',
+  'charge_late_fee',
+  // Common
   'escalate',
 ]);
 
