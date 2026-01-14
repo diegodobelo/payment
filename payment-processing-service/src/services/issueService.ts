@@ -4,13 +4,14 @@ import { issueRepository } from '../repositories/issueRepository.js';
 import { customerRepository } from '../repositories/customerRepository.js';
 import { transactionRepository } from '../repositories/transactionRepository.js';
 import { statusHistoryRepository } from '../repositories/statusHistoryRepository.js';
+import { decisionAnalyticsRepository } from '../repositories/decisionAnalyticsRepository.js';
 import type { AuditContext } from '../repositories/customerRepository.js';
 import {
   evaluate,
   shouldAutoResolve,
-  decisionToResolution,
-  type Decision,
-} from './decisionEngine.js';
+  getResolution,
+  type UnifiedDecision,
+} from './decisionEngineRouter.js';
 
 // Lock constants
 const LOCK_TTL_MS = 30_000; // 30 seconds
@@ -23,7 +24,7 @@ export interface ProcessingResult {
   success: boolean;
   issueId: string;
   status: 'resolved' | 'awaiting_review' | 'failed';
-  decision?: Decision;
+  decision?: UnifiedDecision;
   error?: string;
 }
 
@@ -136,18 +137,18 @@ export async function processIssue(
 
     log.info({ issueType: issue.type }, 'Running decision engine');
 
-    // Run the decision engine
-    const decision = evaluate(issue, customer, transaction);
+    // Run the decision engine (now async to support AI mode)
+    const decision = await evaluate(issue, customer, transaction);
 
     log.info(
-      { decision: decision.decision, confidence: decision.confidence },
+      { decision: decision.decision, confidence: decision.confidence, source: decision.source },
       'Decision engine completed'
     );
 
     // Determine final status and resolution
     const autoResolve = shouldAutoResolve(decision);
     const finalStatus = autoResolve ? 'resolved' : 'awaiting_review';
-    const finalResolution = autoResolve ? decisionToResolution(decision.decision) : null;
+    const finalResolution = autoResolve ? getResolution(decision) : null;
 
     // Update issue with decision
     const updateParams: Parameters<typeof issueRepository.update>[1] = {
@@ -181,6 +182,21 @@ export async function processIssue(
       },
     });
 
+    // Record AI decision in analytics if it needs human review (AI mode only)
+    if (!autoResolve && decision.source === 'ai') {
+      const analyticsParams: Parameters<typeof decisionAnalyticsRepository.createAIDecision>[0] = {
+        issueId,
+        aiDecision: decision.aiRouting ?? 'human_review',
+        aiAction: decision.decision,
+        aiConfidence: decision.confidence * 100, // Convert to 0-100 scale
+        aiReasoning: decision.reason,
+      };
+      if (decision.policyApplied) {
+        analyticsParams.aiPolicyApplied = decision.policyApplied;
+      }
+      await decisionAnalyticsRepository.createAIDecision(analyticsParams);
+    }
+
     log.info({ finalStatus, autoResolve }, 'Issue processing completed');
 
     return {
@@ -190,7 +206,7 @@ export async function processIssue(
       decision,
     };
   } catch (error) {
-    log.error({ error }, 'Error processing issue');
+    log.error({ err: error }, 'Error processing issue');
 
     // Determine if we should mark as failed or leave for retry
     if (error instanceof NonRetryableError) {

@@ -46,7 +46,11 @@ Copy `.env.example` to `.env` and configure the following variables:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `CONFIDENCE_THRESHOLD` | Minimum confidence for auto-approval | `0.80` |
+| `DECISION_ENGINE_MODE` | Engine mode (`rules` or `ai`) | `rules` |
+| `CONFIDENCE_THRESHOLD` | Minimum confidence for auto-approval (rules) | `0.80` |
+| `ANTHROPIC_API_KEY` | API key for AI engine (required when mode=ai) | - |
+| `AI_AUTO_RESOLVE_THRESHOLD` | AI confidence % for auto-resolve | `90` |
+| `AI_HUMAN_REVIEW_THRESHOLD` | AI confidence % for human review | `70` |
 
 ### Security (Required)
 
@@ -168,6 +172,7 @@ pm2 start dist/worker.js --name "payment-worker"
 | `npm run db:studio` | Open Drizzle Studio (database GUI) |
 | `npm run lint` | Run ESLint |
 | `npm run typecheck` | Type-check without emitting |
+| `npm run process-samples` | Run sample issues through decision engine |
 
 ## Security
 
@@ -270,3 +275,124 @@ curl -X POST http://localhost:3000/api/v1/issues \
 - `GET /health` - Liveness check
 - `GET /health/ready` - Readiness check with dependencies
 - `GET /docs` - Swagger UI documentation
+
+## AI Decision Engine Architecture
+
+The service supports two decision engine modes: **rules-based** and **AI-powered**. The mode is controlled by the `DECISION_ENGINE_MODE` environment variable.
+
+### Architecture: Option C with Skills
+
+```
+Issue → Router → [Specialized Agent + Skill] → Decision
+                        ↓
+              Uses: decline-policy.md
+                    dispute-policy.md
+                    refund-policy.md
+                    installment-policy.md
+```
+
+### Why Skills?
+
+We chose Claude Skills for the following reasons:
+
+1. **Separation of concerns** - Each policy domain is a self-contained markdown file
+2. **Easy to update** - Policy changes require editing a skill file, not code
+3. **No code deployment for policy updates** - Skills are loaded at runtime
+4. **Human readable** - Non-engineers can review and suggest policy changes
+5. **Future-ready for ensemble voting** - Each skill can become a voting agent
+
+### Skill Files
+
+Skills are stored in `.claude/skills/`:
+
+| Skill | Purpose |
+|-------|---------|
+| `decline-policy.md` | Handles payment decline issues (insufficient funds, expired card) |
+| `dispute-policy.md` | Handles customer disputes (item not received, unauthorized) |
+| `refund-policy.md` | Handles refund requests (changed mind, defective) |
+| `installment-policy.md` | Handles missed installment payments |
+
+### Confidence-Based Routing
+
+| Confidence | Action |
+|------------|--------|
+| ≥ 90% | Auto-execute the recommendation |
+| 70-89% | Queue for human review |
+| < 70% | Queue for human decision (escalate) |
+
+### Switching Between Modes
+
+**Rules mode (default):**
+```bash
+DECISION_ENGINE_MODE=rules
+```
+
+**AI mode:**
+```bash
+DECISION_ENGINE_MODE=ai
+ANTHROPIC_API_KEY=your-api-key
+```
+
+### Processing Sample Issues
+
+Run the demo script to see how issues are processed:
+
+```bash
+npm run process-samples
+```
+
+Output:
+```
+| Issue ID  | Type               | Decision      | Confidence | Routing       |
+|-----------|--------------------|--------------:|:----------:|---------------|
+| iss_001   | decline            | approve_retry |        85% | auto_resolve  |
+| iss_002   | missed_installment | approve_retry |        75% | human_review  |
+| iss_003   | dispute            |      escalate |        40% | escalate      |
+| iss_004   | refund_request     |      escalate |        55% | escalate      |
+| iss_005   | decline            | approve_retry |        90% | auto_resolve  |
+```
+
+### Adding New Policy Skills
+
+1. Create a new skill file in `.claude/skills/`:
+
+```markdown
+# My New Policy Handler
+
+You analyze [issue type] issues and recommend actions.
+
+## Policy Rules
+[Your policy rules here]
+
+## Output Format
+Return valid JSON:
+{
+  "decision": "auto_resolve" | "human_review" | "escalate",
+  "action": "approve_retry" | "approve_refund" | "reject" | "escalate",
+  "confidence": <0-100>,
+  "reasoning": "<explanation>",
+  "policyApplied": "<which rule>"
+}
+```
+
+2. Update `SKILL_MAP` in `src/services/aiDecisionEngine.ts`
+
+### Human Review Analytics
+
+The system tracks AI vs human decision agreement in the `decision_analytics` table:
+
+- `ai_decision` - What the AI recommended
+- `human_decision` - What the human chose
+- `agreement` - `agreed`, `modified`, or `rejected`
+
+This data helps measure AI accuracy and identify areas for policy improvement.
+
+### Future: Ensemble Voting
+
+The architecture is designed to support multiple policy agents voting on decisions:
+
+```
+Issue → [Multiple Skills in parallel] → Arbiter → Weighted Decision
+```
+
+Each skill would return a weighted vote, and an arbiter skill would combine them for the final decision.

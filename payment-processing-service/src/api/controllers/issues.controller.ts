@@ -19,6 +19,7 @@ import { issueRepository } from '../../repositories/index.js';
 import { customerRepository } from '../../repositories/customerRepository.js';
 import { transactionRepository } from '../../repositories/transactionRepository.js';
 import { statusHistoryRepository } from '../../repositories/statusHistoryRepository.js';
+import { decisionAnalyticsRepository } from '../../repositories/decisionAnalyticsRepository.js';
 import { enqueueIssue } from '../../queue/queueManager.js';
 import type { AuditContext } from '../../repositories/customerRepository.js';
 import type { IssueDetails } from '../../db/schema/issues.js';
@@ -344,6 +345,26 @@ export async function reviewIssue(
     reason: body.reason,
     metadata: { decision: body.decision },
   });
+
+  // Record human review in analytics (if AI decision exists)
+  if (issue.automatedDecision) {
+    // Determine if human agreed with AI
+    let humanDecision: 'approve' | 'reject' | 'modify';
+    if (body.decision === issue.automatedDecision) {
+      humanDecision = 'approve';
+    } else if (body.decision === 'reject' || body.decision === 'escalate') {
+      humanDecision = 'reject';
+    } else {
+      humanDecision = 'modify';
+    }
+
+    await decisionAnalyticsRepository.recordHumanReview(id, {
+      humanDecision,
+      humanAction: body.decision,
+      humanReason: body.reason,
+      reviewedBy: body.reviewer_email,
+    });
+  }
 
   reply.send({
     id: updated.id,

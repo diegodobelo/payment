@@ -7,6 +7,7 @@ export * from './transactions';
 export * from './issues';
 export * from './statusHistory';
 export * from './auditLogs';
+export * from './decisionAnalytics';
 
 // Re-export tables for convenience
 import { customers } from './customers';
@@ -14,6 +15,7 @@ import { transactions } from './transactions';
 import { issues } from './issues';
 import { statusHistory } from './statusHistory';
 import { auditLogs } from './auditLogs';
+import { decisionAnalytics } from './decisionAnalytics';
 
 export const schema = {
   customers,
@@ -21,4 +23,5 @@ export const schema = {
   issues,
   statusHistory,
   auditLogs,
+  decisionAnalytics,
 };

@@ -49,7 +49,7 @@ async function processJob(job: Job<ProcessIssueJobData>): Promise<void> {
       throw new Error(result.error);
     }
   } catch (error) {
-    log.error({ error }, 'Job processing error');
+    log.error({ err: error }, 'Job processing error');
 
     // Non-retryable errors should not be retried
     if (error instanceof NonRetryableError) {
@@ -92,7 +92,7 @@ export function createWorker(): Worker<ProcessIssueJobData> {
   });
 
   worker.on('error', (error) => {
-    logger.error({ error }, 'Worker error');
+    logger.error({ err: error }, 'Worker error');
   });
 
   worker.on('stalled', (jobId) => {

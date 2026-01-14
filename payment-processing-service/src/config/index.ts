@@ -31,6 +31,16 @@ const configSchema = z.object({
       .length(64, 'ENCRYPTION_KEY must be 64 hex characters (32 bytes)'),
   }),
 
+  // Decision Engine
+  decisionEngine: z.object({
+    mode: z.enum(['rules', 'ai']).default('rules'),
+    anthropicApiKey: z.string().optional(),
+    // Confidence thresholds (0-100 scale for AI responses)
+    autoResolveThreshold: z.coerce.number().min(0).max(100).default(90),
+    humanReviewThreshold: z.coerce.number().min(0).max(100).default(70),
+  }),
+
+  // Legacy: kept for backward compatibility with rule-based engine
   confidenceThreshold: z.coerce.number().min(0).max(1).default(0.8),
 
   rateLimit: z.object({
@@ -70,6 +80,13 @@ const configInput = {
 
   security: {
     encryptionKey: process.env['ENCRYPTION_KEY'],
+  },
+
+  decisionEngine: {
+    mode: process.env['DECISION_ENGINE_MODE'],
+    anthropicApiKey: process.env['ANTHROPIC_API_KEY'],
+    autoResolveThreshold: process.env['AI_AUTO_RESOLVE_THRESHOLD'],
+    humanReviewThreshold: process.env['AI_HUMAN_REVIEW_THRESHOLD'],
   },
 
   confidenceThreshold: process.env['CONFIDENCE_THRESHOLD'],
