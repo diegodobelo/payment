@@ -19,7 +19,8 @@
     "db:studio": "drizzle-kit studio",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit",
-    "process-samples": "tsx scripts/process-sample-issues.ts"
+    "process-samples": "tsx scripts/process-sample-issues.ts",
+    "ingest-samples": "tsx scripts/ingest-sample-issues.ts"
   },
   "keywords": [
     "payment",

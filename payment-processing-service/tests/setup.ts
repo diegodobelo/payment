@@ -1,8 +1,24 @@
-import { beforeAll, afterAll, beforeEach } from 'vitest';
+import { beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import { sql } from 'drizzle-orm';
 import { db, closeDatabase } from '../src/db/client.js';
 import { redis, closeRedis } from '../src/lib/redis.js';
 import { issueQueue, closeQueue } from '../src/queue/queueManager.js';
+
+// Mock the Claude Agent SDK globally to prevent API calls during tests
+vi.mock('@anthropic-ai/claude-agent-sdk', () => ({
+  query: vi.fn(async function* () {
+    yield {
+      type: 'result',
+      result: JSON.stringify({
+        decision: 'auto_resolve',
+        action: 'approve_retry',
+        confidence: 85,
+        reasoning: 'Mocked AI response for testing',
+        policyApplied: 'test_policy',
+      }),
+    };
+  }),
+}));
 
 // Ensure test environment
 if (process.env['NODE_ENV'] !== 'test') {
