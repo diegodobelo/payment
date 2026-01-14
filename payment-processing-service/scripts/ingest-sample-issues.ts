@@ -508,20 +508,25 @@ async function main(): Promise<void> {
     }
   }
 
-  // Wait for processing
-  console.log('\n⏳ Waiting for queue processing...');
-  const results: IssueResponse[] = [];
+  // Wait for processing (parallel)
+  console.log('\n⏳ Processing issues in parallel...\n');
 
+  // Show initial status for all issues
   for (const issue of createdIssues) {
-    process.stdout.write(`   Processing ${issue.externalId}...`);
-    const processed = await waitForProcessing(issue.id);
-    if (processed) {
-      results.push(processed);
-      console.log(` ✓ ${processed.status}`);
-    } else {
-      console.log(' ✗ failed');
-    }
+    console.log(`   ${issue.externalId}: ⏳ waiting...`);
   }
+
+  // Process all in parallel, logging as each completes
+  const resultsWithNulls = await Promise.all(
+    createdIssues.map(async (issue) => {
+      const processed = await waitForProcessing(issue.id);
+      const status = processed ? `✓ ${processed.status}` : '✗ timeout';
+      console.log(`   ${issue.externalId}: ${status}`);
+      return processed;
+    })
+  );
+
+  const results = resultsWithNulls.filter((r): r is IssueResponse => r !== null);
 
   // Display results
   console.log('\n╔═══════════════════════════════════════════════════════════════════════════╗');
