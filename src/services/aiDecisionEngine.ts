@@ -149,8 +149,8 @@ export async function evaluateWithAI(
 ): Promise<AIDecision> {
   const log = logger.child({ issueId: issue.id, issueType: issue.type });
 
-  // Check for API key
-  if (!config.decisionEngine.anthropicApiKey) {
+  // Check for API key (skip in test mode where SDK is mocked)
+  if (!config.decisionEngine.anthropicApiKey && config.nodeEnv !== 'test') {
     throw new Error('ANTHROPIC_API_KEY is required for AI decision engine');
   }
 
