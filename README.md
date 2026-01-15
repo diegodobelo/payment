@@ -15,6 +15,7 @@ Automated payment issue processing service with decision engine and asynchronous
 - [Security](#security)
 - [Database Scaling](#database-scaling)
 - [API Usage](#api-usage)
+- [Tests](#tests)
 - [Environment Variables](#environment-variables)
 - [Libraries](#libraries)
 
@@ -656,6 +657,39 @@ The system tracks AI vs human decision agreement in the `decision_analytics` tab
 
 This data helps measure AI accuracy and identify areas for policy improvement.
 
+
+## Tests
+
+The test suite covers API endpoints, queue processing with retry/failure handling, and edge cases. Tests use [Vitest](https://vitest.dev/) and require PostgreSQL and Redis running locally.
+
+### Running Tests
+
+```bash
+# Run tests once
+npm run test:run
+
+# Run tests in watch mode
+npm test
+
+# Run tests with coverage
+npm run test:coverage
+```
+
+### Test Coverage
+
+| Test File | Coverage |
+|-----------|----------|
+| `tests/integration/api/issues.test.ts` | API endpoint tests for `POST /api/v1/issues` - validates issue creation, response structure, and idempotency key handling |
+| `tests/integration/queue/processing.test.ts` | Queue retry/failure handling - tests decision engine routing, auto-resolve vs escalation, and issue type processing |
+| `tests/integration/ai/aiDecisionEngine.test.ts` | AI decision engine - tests response parsing, confidence scoring, and error handling with mocked Claude SDK |
+| `tests/integration/edgeCases.test.ts` | Edge cases - concurrent idempotency (10 simultaneous requests with same key), duplicate detection |
+
+### Test Infrastructure
+
+Tests run against real PostgreSQL and Redis instances (same as development). The test setup (`tests/setup.ts`):
+- Truncates all tables before each test for isolation
+- Mocks the Claude Agent SDK to avoid API calls
+- Provides helpers for seeding test data (customers, transactions)
 
 ## Environment Variables
 
