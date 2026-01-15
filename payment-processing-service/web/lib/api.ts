@@ -4,6 +4,11 @@ import type {
   GetIssuesParams,
   PaginatedResponse,
   ReviewSubmission,
+  AgreementStats,
+  DecisionRecord,
+  GetDecisionsParams,
+  AuditLogEntry,
+  GetAuditLogsParams,
 } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
@@ -81,6 +86,53 @@ export async function submitReview(
     method: 'POST',
     body: JSON.stringify(data),
   });
+}
+
+/**
+ * Get AI decision agreement statistics.
+ */
+export async function getAgreementStats(): Promise<AgreementStats> {
+  return fetchApi<AgreementStats>('/api/v1/analytics/stats');
+}
+
+/**
+ * Get paginated list of decision records.
+ */
+export async function getDecisionRecords(
+  params: GetDecisionsParams = {}
+): Promise<PaginatedResponse<DecisionRecord>> {
+  const searchParams = new URLSearchParams();
+
+  if (params.agreement) searchParams.set('agreement', params.agreement);
+  if (params.ai_decision) searchParams.set('ai_decision', params.ai_decision);
+  if (params.page) searchParams.set('page', params.page.toString());
+  if (params.limit) searchParams.set('limit', params.limit.toString());
+
+  const query = searchParams.toString();
+  const endpoint = `/api/v1/analytics/decisions${query ? `?${query}` : ''}`;
+
+  return fetchApi<PaginatedResponse<DecisionRecord>>(endpoint);
+}
+
+/**
+ * Get paginated list of audit logs.
+ */
+export async function getAuditLogs(
+  params: GetAuditLogsParams = {}
+): Promise<PaginatedResponse<AuditLogEntry>> {
+  const searchParams = new URLSearchParams();
+
+  if (params.entity_type) searchParams.set('entity_type', params.entity_type);
+  if (params.entity_id) searchParams.set('entity_id', params.entity_id);
+  if (params.action) searchParams.set('action', params.action);
+  if (params.actor) searchParams.set('actor', params.actor);
+  if (params.page) searchParams.set('page', params.page.toString());
+  if (params.limit) searchParams.set('limit', params.limit.toString());
+
+  const query = searchParams.toString();
+  const endpoint = `/api/v1/audit-logs${query ? `?${query}` : ''}`;
+
+  return fetchApi<PaginatedResponse<AuditLogEntry>>(endpoint);
 }
 
 export { ApiError };

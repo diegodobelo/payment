@@ -7,6 +7,8 @@ import { errorHandler } from '../src/api/middleware/errorHandler.js';
 import { requestIdHook } from '../src/api/middleware/requestId.js';
 import { healthRoutes } from '../src/api/routes/health.routes.js';
 import { issueRoutes } from '../src/api/routes/issues.routes.js';
+import { analyticsRoutes } from '../src/api/routes/analytics.routes.js';
+import { auditLogsRoutes } from '../src/api/routes/audit-logs.routes.js';
 
 // AI Mock Response Types
 export interface AIResponseData {
@@ -78,6 +80,8 @@ export async function buildApp() {
   app.setErrorHandler(errorHandler as Parameters<typeof app.setErrorHandler>[0]);
   await app.register(healthRoutes);
   await app.register(issueRoutes, { prefix: '/api/v1' });
+  await app.register(analyticsRoutes, { prefix: '/api/v1' });
+  await app.register(auditLogsRoutes, { prefix: '/api/v1' });
 
   return app;
 }

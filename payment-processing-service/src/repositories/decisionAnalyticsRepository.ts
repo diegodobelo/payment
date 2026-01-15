@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm';
+import { eq, sql, desc, and, type SQL } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { dbReplica } from '../db/replica.js';
 import {
@@ -135,9 +135,93 @@ export async function getAgreementStats(): Promise<{
   };
 }
 
+/**
+ * Filters for listing decision analytics.
+ */
+export interface DecisionAnalyticsFilters {
+  agreement?: 'agreed' | 'modified' | 'rejected' | null;
+  aiDecision?: string;
+}
+
+/**
+ * Pagination options.
+ */
+export interface AnalyticsPaginationOptions {
+  page?: number;
+  limit?: number;
+}
+
+/**
+ * Paginated result.
+ */
+export interface PaginatedAnalyticsResult<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+/**
+ * List decision analytics records with optional filters and pagination.
+ */
+export async function findAll(
+  filters?: DecisionAnalyticsFilters,
+  pagination?: AnalyticsPaginationOptions
+): Promise<PaginatedAnalyticsResult<DecisionAnalyticsEntry>> {
+  const page = pagination?.page ?? 1;
+  const limit = pagination?.limit ?? 20;
+  const offset = (page - 1) * limit;
+
+  // Build where conditions
+  const conditions: SQL[] = [];
+
+  if (filters?.agreement !== undefined) {
+    if (filters.agreement === null) {
+      conditions.push(sql`${decisionAnalytics.agreement} is null`);
+    } else {
+      conditions.push(eq(decisionAnalytics.agreement, filters.agreement));
+    }
+  }
+  if (filters?.aiDecision) {
+    conditions.push(eq(decisionAnalytics.aiDecision, filters.aiDecision));
+  }
+
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+  // Get total count
+  const countResult = await dbReplica
+    .select({ count: sql<number>`count(*)::int` })
+    .from(decisionAnalytics)
+    .where(whereClause);
+  const total = countResult[0]?.count ?? 0;
+
+  // Get paginated data
+  const data = await dbReplica
+    .select()
+    .from(decisionAnalytics)
+    .where(whereClause)
+    .orderBy(desc(decisionAnalytics.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  return {
+    data,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
+}
+
 export const decisionAnalyticsRepository = {
   createAIDecision,
   recordHumanReview,
   findByIssueId,
   getAgreementStats,
+  findAll,
 };

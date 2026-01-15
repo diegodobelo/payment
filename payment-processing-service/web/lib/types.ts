@@ -154,3 +154,69 @@ export const DECISION_OPTIONS: Record<IssueType, { value: DecisionType; label: s
     { value: 'charge_late_fee', label: 'Charge Late Fee' },
   ],
 };
+
+// Analytics types
+export interface AgreementStats {
+  total: number;
+  agreed: number;
+  modified: number;
+  rejected: number;
+  pending: number;
+  agreement_rate: number;
+}
+
+export interface DecisionRecord {
+  id: string;
+  issue_id: string;
+  ai_decision: string | null;
+  ai_action: string | null;
+  ai_confidence: number | null;
+  ai_reasoning: string | null;
+  ai_policy_applied: string | null;
+  human_decision: string | null;
+  human_action: string | null;
+  human_reason: string | null;
+  agreement: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+}
+
+export interface GetDecisionsParams {
+  agreement?: 'agreed' | 'modified' | 'rejected' | 'pending';
+  ai_decision?: string;
+  page?: number;
+  limit?: number;
+}
+
+// Audit log types
+export type AuditEntityType = 'issue' | 'customer' | 'transaction';
+export type AuditAction = 'create' | 'update' | 'delete' | 'review' | 'pii_access';
+
+export interface AuditChange {
+  field: string;
+  oldValue: unknown;
+  newValue: unknown;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  entity_type: AuditEntityType;
+  entity_id: string;
+  action: AuditAction;
+  actor: string;
+  actor_ip: string | null;
+  request_id: string | null;
+  changes: AuditChange[] | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface GetAuditLogsParams {
+  entity_type?: AuditEntityType;
+  entity_id?: string;
+  action?: AuditAction;
+  actor?: string;
+  page?: number;
+  limit?: number;
+}

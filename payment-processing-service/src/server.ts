@@ -10,6 +10,8 @@ import { errorHandler } from './api/middleware/errorHandler.js';
 import { requestIdHook } from './api/middleware/requestId.js';
 import { healthRoutes } from './api/routes/health.routes.js';
 import { issueRoutes } from './api/routes/issues.routes.js';
+import { analyticsRoutes } from './api/routes/analytics.routes.js';
+import { auditLogsRoutes } from './api/routes/audit-logs.routes.js';
 
 // Create Fastify instance
 const app = Fastify({
@@ -59,6 +61,8 @@ async function registerPlugins() {
       servers: [{ url: `http://localhost:${config.port}` }],
       tags: [
         { name: 'issues', description: 'Payment issue operations' },
+        { name: 'analytics', description: 'Decision analytics and statistics' },
+        { name: 'audit-logs', description: 'Audit log operations' },
         { name: 'health', description: 'Service health checks' },
       ],
     },
@@ -80,6 +84,8 @@ function registerHooks() {
 async function registerRoutes() {
   await app.register(healthRoutes);
   await app.register(issueRoutes, { prefix: '/api/v1' });
+  await app.register(analyticsRoutes, { prefix: '/api/v1' });
+  await app.register(auditLogsRoutes, { prefix: '/api/v1' });
 }
 
 // Set error handler
