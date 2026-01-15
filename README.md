@@ -393,6 +393,20 @@ Open http://localhost:3001 to access the dashboard. Features:
 - Click an issue to see full details and processing history
 - Submit human reviews for issues in `awaiting_review` status
 
+**Screenshots:**
+
+*Issues List*
+![Issues List](docs/screenshots/1.png)
+
+*Issue Detail*
+![Issue Detail](docs/screenshots/2.png)
+
+*Analytics*
+![Analytics](docs/screenshots/3.png)
+
+*Audit Logs*
+![Audit Logs](docs/screenshots/4.png)
+
 ### 6. Test the Pipeline
 
 Run the sample ingestion script to verify everything works:
