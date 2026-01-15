@@ -2,6 +2,22 @@
 
 Automated payment issue processing service with decision engine and asynchronous job queue support. Built with TypeScript, Fastify, BullMQ, PostgreSQL, and Redis.
 
+## Table of Contents
+
+- [Prerequisites](#prerequisites)
+- [Architecture & Design](#architecture--design)
+  - [Architecture Overview](#architecture-overview)
+  - [Database Schema](#database-schema)
+  - [Trade-offs & Decisions](#trade-offs--decisions)
+  - [Future Work](#future-work)
+- [Local Development](#local-development)
+- [Available Scripts](#available-scripts)
+- [Security](#security)
+- [Database Scaling](#database-scaling)
+- [API Usage](#api-usage)
+- [Environment Variables](#environment-variables)
+- [Libraries](#libraries)
+
 ## Prerequisites
 
 - Node.js >= 20.0.0
@@ -273,19 +289,6 @@ AI Request
 
 This ensures AI failures don't block processing—the local rules engine provides a deterministic fallback.
 
-##### Switching Between Modes
-
-**Local rules mode (default):**
-```bash
-DECISION_ENGINE_MODE=rules
-```
-
-**AI mode:**
-```bash
-DECISION_ENGINE_MODE=ai
-ANTHROPIC_API_KEY=your-api-key
-```
-
 **Single Agent Alternative:** A colleague might argue that a single "payment issue expert" agent with all policies in one prompt would be simpler—one file to maintain, no routing logic, potentially better cross-policy reasoning. This is valid for small policy sets, but becomes problematic as policies grow. A single prompt containing 4+ detailed policy documents would be harder to maintain, slower to iterate on, and more expensive per API call. The skill approach also positions us for future **ensemble voting**: multiple specialized agents could evaluate the same issue independently, with an arbiter combining their recommendations. This architecture is common in high-stakes decision systems where we want to catch edge cases that any single model might miss.
 
 ### Future work
@@ -311,10 +314,12 @@ With more time, these improvements would have the highest impact, in priority or
 9. **Future: Ensemble Voting** - The architecture is designed to support multiple policy agents voting on decisions:
 
 ```
-Issue → [Multiple Skills in parallel] → Arbiter → Weighted Decision
+Issue → [Multiple Skills or Agents in parallel] → Arbiter → Weighted Decision
 ```
 
-Each skill would return a weighted vote, and an arbiter skill would combine them for the final decision.
+Each skill or agent would return a weighted vote, and an arbiter skill would combine them for the final decision. For the agents we can use different providers, such as OpenAI, Google, DeepSeek, etc.
+
+10. **Do not fallback to local rules when AI fails** - Use other agents as mentioned in 9. If all of them fails we can escalate the issue for a human review.
 
 ## Local Development
 
@@ -433,7 +438,6 @@ Issues route based on confidence: ≥90% auto-resolves, 70-89% needs human revie
 | `npm run db:migrate` | Apply pending database migrations |
 | `npm run db:seed` | Seed database with sample data |
 | `npm run db:studio` | Open Drizzle Studio (database GUI) |
-| `npm run lint` | Run ESLint |
 | `npm run typecheck` | Type-check without emitting |
 | `npm run ingest-samples` | Run sample issues through end-to-end pipeline |
 | `npm run archive-issues` | Archive resolved issues to cold storage |
@@ -610,6 +614,9 @@ curl -X POST http://localhost:3000/api/v1/issues \
 - `GET /api/v1/issues` - List issues (supports `?status=`, `?type=`, `?customer_id=`)
 - `GET /api/v1/issues/:id` - Get issue details
 - `POST /api/v1/issues/:id/review` - Submit human review
+- `GET /api/v1/analytics/stats` - AI decision agreement statistics
+- `GET /api/v1/analytics/decisions` - List decision analytics (supports `?agreement=`, `?ai_decision=`)
+- `GET /api/v1/audit-logs` - List audit logs (supports `?entity_type=`, `?action=`, `?actor=`)
 - `GET /health` - Liveness check
 - `GET /health/ready` - Readiness check with dependencies
 - `GET /docs` - Swagger UI documentation
