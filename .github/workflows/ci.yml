@@ -3,16 +3,8 @@ name: CI
 on:
   push:
     branches: [main]
-    paths:
-      - 'payment-processing-service/**'
   pull_request:
     branches: [main]
-    paths:
-      - 'payment-processing-service/**'
-
-defaults:
-  run:
-    working-directory: payment-processing-service
 
 jobs:
   lint:
@@ -24,7 +16,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: payment-processing-service/package-lock.json
+          cache-dependency-path: package-lock.json
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
@@ -61,12 +53,13 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: payment-processing-service/package-lock.json
+          cache-dependency-path: package-lock.json
       - run: npm ci
       - name: Run migrations
         run: npm run db:migrate
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/payment_test
+          REDIS_URL: redis://localhost:6379
           ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
       - name: Run tests
         run: npm run test:run
