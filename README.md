@@ -322,6 +322,8 @@ Each skill or agent would return a weighted vote, and an arbiter skill would com
 
 10. **Do not fallback to local rules when AI fails** - Use other agents as mentioned in 9. If all of them fails we can escalate the issue for a human review.
 
+11. **Single Source of Truth for Decision Types** — Decision types and actions are currently defined in multiple places: database enums (`src/db/schema/enums.ts`), AI policy files (`.claude/skills/*-policy.md`), web frontend types (`web/lib/types.ts`), and backend validation. Adding a new decision type requires updating all four locations. A better approach would be to expose an API endpoint (e.g., `/api/v1/config/decisions`) that returns valid options from the database enum, allowing the frontend and policy files to reference a single source of truth.
+
 ## Local Development
 
 ### 1. Configure Environment
