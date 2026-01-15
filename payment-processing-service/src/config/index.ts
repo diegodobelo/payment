@@ -11,7 +11,6 @@ const configSchema = z.object({
 
   database: z.object({
     url: z.string().min(1, 'DATABASE_URL is required'),
-    poolMin: z.coerce.number().default(2),
     poolMax: z.coerce.number().default(10),
   }),
 
@@ -64,7 +63,6 @@ const configInput = {
 
   database: {
     url: process.env['DATABASE_URL'],
-    poolMin: process.env['DATABASE_POOL_MIN'],
     poolMax: process.env['DATABASE_POOL_MAX'],
   },
 
