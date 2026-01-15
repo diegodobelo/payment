@@ -39,7 +39,7 @@ function loadSkill(issueType: string): string {
   const skillPath = join(process.cwd(), '.claude', 'skills', skillFile);
   try {
     return readFileSync(skillPath, 'utf-8');
-  } catch (error) {
+  } catch {
     throw new Error(`Failed to load skill file: ${skillPath}`);
   }
 }

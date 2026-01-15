@@ -291,7 +291,7 @@ async function seedIssues(data: RawIssue[]): Promise<void> {
         } satisfies DisputeDetails;
         break;
 
-      case 'refund_request':
+      case 'refund_request': {
         issueType = 'refund_request';
         const refundDetails: RefundRequestDetails = {
           reason: (raw.reason ?? 'changed_mind') as RefundRequestDetails['reason'],
@@ -302,6 +302,7 @@ async function seedIssues(data: RawIssue[]): Promise<void> {
         }
         details = refundDetails;
         break;
+      }
 
       default:
         logger.warn('Unknown issue type for %s: %s', raw.id, raw.type);

@@ -17,7 +17,8 @@
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
     "db:studio": "drizzle-kit studio",
-        "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/ scripts/ tests/",
     "ingest-samples": "tsx scripts/ingest-sample-issues.ts",
     "archive-issues": "tsx scripts/archive-issues.ts",
     "partition-issues": "tsx scripts/partition-issues.ts"
@@ -51,11 +52,14 @@
     "zod": "^4.3.5"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.2",
     "@types/node": "^25.0.7",
     "@vitest/coverage-v8": "^4.0.17",
     "drizzle-kit": "^0.31.8",
+    "eslint": "^9.39.2",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
+    "typescript-eslint": "^8.53.0",
     "vitest": "^4.0.17"
   }
 }

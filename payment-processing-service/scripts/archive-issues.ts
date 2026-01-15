@@ -11,7 +11,7 @@
  *   npm run archive-issues -- --purge-days 365  # Purge archives older than 365 days
  */
 
-import { config } from '../src/config/index.js';
+import '../src/config/index.js'; // Load config for environment validation
 import { closeDatabase } from '../src/db/client.js';
 import {
   archiveResolvedIssues,

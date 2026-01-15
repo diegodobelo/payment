@@ -9,12 +9,10 @@ import { issueRepository } from '../../../src/repositories/issueRepository.js';
 describe('Issue Processing', () => {
   let customerId: string;
   let transactionId: string;
-  let customerRiskScore: 'low' | 'medium' | 'high';
 
   beforeEach(async () => {
     const customer = await seedTestCustomer({ riskScore: 'low', successfulPayments: 10 });
     customerId = customer.id;
-    customerRiskScore = 'low';
     const transaction = await seedTestTransaction(customerId);
     transactionId = transaction.id;
   });
