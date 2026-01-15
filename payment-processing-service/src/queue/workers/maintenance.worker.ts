@@ -1,5 +1,8 @@
 import { Worker, Job } from 'bullmq';
+import { lt, sql } from 'drizzle-orm';
 import { config } from '../../config/index.js';
+import { db } from '../../db/client.js';
+import { auditLogs } from '../../db/schema/index.js';
 import { logger } from '../../lib/logger.js';
 import {
   archiveResolvedIssues,
@@ -75,6 +78,36 @@ async function processJob(job: Job<MaintenanceJobData>): Promise<void> {
             `Partition creation completed with errors: ${result.errors.join(', ')}`
           );
         }
+        break;
+      }
+
+      case 'purge-audit-logs': {
+        // Delete audit logs older than retention period
+        const cutoffDate = new Date();
+        cutoffDate.setDate(
+          cutoffDate.getDate() - config.maintenance.auditLogs.retentionDays
+        );
+
+        // Count before deleting for logging
+        const [countResult] = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(auditLogs)
+          .where(lt(auditLogs.createdAt, cutoffDate));
+
+        const toDeleteCount = countResult?.count ?? 0;
+
+        if (toDeleteCount > 0) {
+          await db.delete(auditLogs).where(lt(auditLogs.createdAt, cutoffDate));
+        }
+
+        log.info(
+          {
+            deletedCount: toDeleteCount,
+            retentionDays: config.maintenance.auditLogs.retentionDays,
+            cutoffDate: cutoffDate.toISOString(),
+          },
+          'Audit log purge completed'
+        );
         break;
       }
 

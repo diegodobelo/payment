@@ -71,6 +71,12 @@ const configSchema = z.object({
       // Cron schedule for partition creation (default: 1st of month at 3 AM)
       schedule: z.string().default('0 3 1 * *'),
     }),
+    auditLogs: z.object({
+      // Delete audit logs older than this many days (default 90 days)
+      retentionDays: z.coerce.number().default(90),
+      // Cron schedule for audit log purge (default: daily at 3 AM)
+      schedule: z.string().default('0 3 * * *'),
+    }),
   }),
 });
 
@@ -130,6 +136,10 @@ const configInput = {
     },
     partition: {
       schedule: process.env['MAINTENANCE_PARTITION_SCHEDULE'],
+    },
+    auditLogs: {
+      retentionDays: process.env['MAINTENANCE_AUDIT_LOGS_RETENTION_DAYS'],
+      schedule: process.env['MAINTENANCE_AUDIT_LOGS_SCHEDULE'],
     },
   },
 };

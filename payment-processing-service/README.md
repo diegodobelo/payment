@@ -73,7 +73,7 @@ The schema prioritizes **flexibility and compliance** over query simplicity. The
 
 PII fields (customer email/name, payment methods) are encrypted at the application layer using AES-256-GCM rather than database-level encryption (like `pgcrypto`). This means encrypted data is opaque to PostgreSQL—we can't query by email or build indexes on names. The trade-off is worth it: application-level encryption lets us control key management, implement field-level access logging, and avoid exposing plaintext to database backups or admin tools. The `audit_logs` table is separate from `issues` to maintain a clean append-only compliance trail, though this means joining tables to correlate changes.
 
-**Scaling to 10,000 issues/day:** At this volume (~7 issues/minute), the service includes infrastructure for scaling (see [Database Scaling](#database-scaling)): table partitioning by `created_at` for efficient queries on recent data, TimescaleDB hypertables for audit logs with automatic compression and retention, read replica support for reporting queries, and scheduled archival jobs that move resolved issues to cold storage and purge old archives. These features run automatically via the worker process.
+**Scaling to 10,000 issues/day:** At this volume (~7 issues/minute), the service includes infrastructure for scaling (see [Database Scaling](#database-scaling)): table partitioning by `created_at` for efficient queries on recent data, automatic retention policies for audit logs, read replica support for reporting queries, and scheduled archival jobs that move resolved issues to cold storage and purge old archives. These features run automatically via the worker process.
 
 #### Queue Design
 
@@ -155,17 +155,7 @@ npm install
 npm run db:migrate
 ```
 
-### 4. Enable TimescaleDB (Optional)
-
-For time-series optimizations on audit logs (automatic compression and retention):
-
-```bash
-npm run setup-timescaledb
-```
-
-This is optional for development but recommended for production.
-
-### 5. Run the Service
+### 4. Run the Service
 
 Start the development server:
 
@@ -179,7 +169,7 @@ Start the worker (in a separate terminal):
 npm run worker:dev
 ```
 
-### 6. Test the Pipeline
+### 5. Test the Pipeline
 
 Run the sample ingestion script to verify everything works:
 
@@ -229,7 +219,6 @@ Issues route based on confidence: ≥90% auto-resolves, 70-89% needs human revie
 | `npm run typecheck` | Type-check without emitting |
 | `npm run process-samples` | Run sample issues through decision engine |
 | `npm run archive-issues` | Archive resolved issues to cold storage |
-| `npm run setup-timescaledb` | Enable TimescaleDB features for audit logs |
 | `npm run partition-issues` | Partition issues table for scaling |
 
 ## Security
@@ -290,19 +279,9 @@ npm run archive-issues -- --stats
 
 Archived issues are preserved in `issues_archive` for compliance and can still be queried.
 
-### TimescaleDB for Audit Logs
+### Audit Log Retention
 
-The docker-compose uses TimescaleDB for time-series optimizations on `audit_logs`:
-
-```bash
-# After starting infrastructure, enable TimescaleDB features
-npm run setup-timescaledb
-```
-
-This configures:
-- Automatic chunking (1-day intervals)
-- Compression policy (chunks older than 7 days)
-- Retention policy (drop chunks older than 90 days)
+Audit logs are automatically purged after 90 days (configurable via `MAINTENANCE_AUDIT_LOGS_RETENTION_DAYS`). The worker runs the purge job daily at 3 AM by default.
 
 ### Table Partitioning
 
@@ -616,3 +595,5 @@ openssl rand -hex 32
 | `MAINTENANCE_ARCHIVE_PURGE_AFTER_DAYS` | Purge archives older than N days | `730` (2 years) |
 | `MAINTENANCE_ARCHIVE_SCHEDULE` | Cron schedule for archival | `0 2 * * *` (daily 2 AM) |
 | `MAINTENANCE_PARTITION_SCHEDULE` | Cron schedule for partition creation | `0 3 1 * *` (1st of month 3 AM) |
+| `MAINTENANCE_AUDIT_LOGS_RETENTION_DAYS` | Delete audit logs older than N days | `90` |
+| `MAINTENANCE_AUDIT_LOGS_SCHEDULE` | Cron schedule for audit log purge | `0 3 * * *` (daily 3 AM) |

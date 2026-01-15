@@ -11,7 +11,7 @@ const connection = {
 };
 
 // Job types
-export type MaintenanceJobType = 'archive-issues' | 'create-partition';
+export type MaintenanceJobType = 'archive-issues' | 'create-partition' | 'purge-audit-logs';
 
 export interface MaintenanceJobData {
   type: MaintenanceJobType;
@@ -96,6 +96,22 @@ export async function registerScheduledJobs(): Promise<void> {
   log.info(
     { schedule: config.maintenance.partition.schedule },
     'Scheduled create-partition job'
+  );
+
+  // Schedule audit log purge (daily by default)
+  await maintenanceQueue.add(
+    'purge-audit-logs',
+    { type: 'purge-audit-logs' },
+    {
+      repeat: {
+        pattern: config.maintenance.auditLogs.schedule,
+      },
+      jobId: 'scheduled-audit-purge',
+    }
+  );
+  log.info(
+    { schedule: config.maintenance.auditLogs.schedule },
+    'Scheduled purge-audit-logs job'
   );
 
   log.info('Maintenance jobs scheduled successfully');

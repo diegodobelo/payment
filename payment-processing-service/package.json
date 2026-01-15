@@ -21,7 +21,6 @@
     "process-samples": "tsx scripts/process-sample-issues.ts",
     "ingest-samples": "tsx scripts/ingest-sample-issues.ts",
     "archive-issues": "tsx scripts/archive-issues.ts",
-    "setup-timescaledb": "tsx scripts/setup-timescaledb.ts",
     "partition-issues": "tsx scripts/partition-issues.ts"
   },
   "keywords": [
