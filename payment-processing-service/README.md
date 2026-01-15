@@ -65,6 +65,59 @@ Automated payment issue processing service with decision engine and asynchronous
 | Decision Engine | Business logic evaluation, AI prompt construction, confidence scoring |
 | Repositories | Data access, PII encryption/decryption, audit logging |
 
+### Database Schema
+
+Schema defined using [Drizzle ORM](https://orm.drizzle.team/) in `src/db/schema/`.
+
+```
+┌─────────────┐       ┌──────────────┐       ┌─────────────────┐
+│  customers  │───┐   │ transactions │───┐   │     issues      │
+├─────────────┤   │   ├──────────────┤   │   ├─────────────────┤
+│ id (PK)     │   │   │ id (PK)      │   │   │ id (PK)         │
+│ external_id │   │   │ external_id  │   │   │ external_id     │
+│ email_enc   │   └──▶│ customer_id  │   └──▶│ customer_id     │
+│ name_enc    │       │ merchant     │       │ transaction_id  │
+│ risk_score  │       │ amount       │       │ type            │
+│ ...         │       │ status       │       │ status          │
+└─────────────┘       │ ...          │       │ details (JSONB) │
+                      └──────────────┘       │ decisions...    │
+                                             └────────┬────────┘
+                                                      │
+                      ┌──────────────────────────────┬┴─────────────────┐
+                      ▼                              ▼                  ▼
+              ┌───────────────┐           ┌─────────────────┐  ┌───────────────────┐
+              │status_history │           │   audit_logs    │  │decision_analytics │
+              ├───────────────┤           ├─────────────────┤  ├───────────────────┤
+              │ id (PK)       │           │ id (PK)         │  │ id (PK)           │
+              │ issue_id (FK) │           │ entity_type     │  │ issue_id (FK)     │
+              │ from_status   │           │ entity_id       │  │ ai_decision       │
+              │ to_status     │           │ action          │  │ human_decision    │
+              │ changed_by    │           │ actor           │  │ agreement         │
+              └───────────────┘           │ changes (JSONB) │  └───────────────────┘
+                                          └─────────────────┘
+```
+
+**Tables:**
+
+| Table | Purpose |
+|-------|---------|
+| `customers` | Customer profiles with encrypted PII (email, name) and risk scoring |
+| `transactions` | Payment transactions with installment plans and shipping info (JSONB) |
+| `issues` | Payment issues—the core entity with type-specific details (JSONB) |
+| `status_history` | Audit trail of issue status transitions |
+| `audit_logs` | Compliance logging for all data access and modifications |
+| `decision_analytics` | Tracks AI vs human decisions for accuracy measurement |
+| `issues_archive` | Cold storage for resolved issues (partitioned by date) |
+
+**Key Enums:**
+
+| Enum | Values |
+|------|--------|
+| `issue_type` | `decline`, `missed_installment`, `dispute`, `refund_request` |
+| `issue_status` | `pending`, `processing`, `awaiting_review`, `resolved`, `failed` |
+| `decision_type` | `retry_payment`, `block_card`, `approve_refund`, `deny_refund`, `accept_dispute`, `contest_dispute`, `send_reminder`, `charge_late_fee`, `escalate` |
+| `priority_level` | `low`, `normal`, `high`, `critical` |
+
 ### Trade-offs & Decisions
 
 #### Database Schema
@@ -648,3 +701,42 @@ openssl rand -hex 32
 | `MAINTENANCE_PARTITION_SCHEDULE` | Cron schedule for partition creation | `0 3 1 * *` (1st of month 3 AM) |
 | `MAINTENANCE_AUDIT_LOGS_RETENTION_DAYS` | Delete audit logs older than N days | `90` |
 | `MAINTENANCE_AUDIT_LOGS_SCHEDULE` | Cron schedule for audit log purge | `0 3 * * *` (daily 3 AM) |
+
+## Libraries
+
+### Backend
+
+| Library | Purpose |
+|---------|---------|
+| [Fastify](https://fastify.dev/) | High-performance web framework. Chosen over Express for its speed, built-in validation, and first-class TypeScript support. |
+| [BullMQ](https://bullmq.io/) | Redis-based job queue for background processing. Provides retries, priorities, rate limiting, and job persistence. |
+| [Drizzle ORM](https://orm.drizzle.team/) | TypeScript ORM with type-safe queries. Lightweight alternative to Prisma with better SQL control. |
+| [Zod](https://zod.dev/) | Schema validation library. Used for request validation, environment config, and type inference. |
+| [Pino](https://getpino.io/) | Fast JSON logger. Low overhead, structured logging with automatic redaction of sensitive fields. |
+| [ioredis](https://github.com/redis/ioredis) | Redis client for Node.js. Used by BullMQ for job queue persistence. |
+| [postgres](https://github.com/porsager/postgres) | PostgreSQL client. Fast, lightweight driver used with Drizzle ORM. |
+| [@anthropic-ai/claude-agent-sdk](https://github.com/anthropics/claude-code/tree/main/agent-sdk) | Claude Agent SDK for AI-powered decisions. Enables skill-based prompting and structured responses. |
+| [@fastify/swagger](https://github.com/fastify/fastify-swagger) | OpenAPI documentation generator. Auto-generates API docs from route schemas. |
+| [@fastify/rate-limit](https://github.com/fastify/fastify-rate-limit) | Rate limiting middleware. Protects API from abuse. |
+| [dotenv](https://github.com/motdotla/dotenv) | Environment variable loader. Loads `.env` files in development. |
+
+### Frontend (Web Dashboard)
+
+| Library | Purpose |
+|---------|---------|
+| [Next.js](https://nextjs.org/) | React framework with App Router. Server components for data fetching, file-based routing. |
+| [React](https://react.dev/) | UI library. Version 19 with server components support. |
+| [Tailwind CSS](https://tailwindcss.com/) | Utility-first CSS framework. Rapid styling without custom CSS. |
+| [Radix UI](https://www.radix-ui.com/) | Headless UI components. Accessible primitives for selects, labels, and other form elements. |
+| [Lucide React](https://lucide.dev/) | Icon library. Clean, consistent SVG icons. |
+| [clsx](https://github.com/lukeed/clsx) / [tailwind-merge](https://github.com/dcastil/tailwind-merge) | Utility for conditional class names and merging Tailwind classes. |
+
+### Development Tools
+
+| Library | Purpose |
+|---------|---------|
+| [TypeScript](https://www.typescriptlang.org/) | Static typing for JavaScript. Catches errors at compile time. |
+| [Vitest](https://vitest.dev/) | Test runner. Fast, ESM-native, compatible with Jest API. |
+| [tsx](https://github.com/privatenumber/tsx) | TypeScript executor. Runs `.ts` files directly without compilation step. |
+| [Drizzle Kit](https://orm.drizzle.team/kit-docs/overview) | Database migration tool. Generates and applies schema migrations. |
+| [ESLint](https://eslint.org/) | Linter for JavaScript/TypeScript. Enforces code quality rules. |
