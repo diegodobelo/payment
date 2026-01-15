@@ -109,7 +109,7 @@ With more time, these improvements would have the highest impact, in priority or
 
 7. **Event-Driven Notifications** — Emit events (via webhooks or message queue) when issues change status. External systems could subscribe to trigger customer notifications, update dashboards, or sync with support tools.
 
-8. **Reviewer Dashboard** — Build a simple web UI for human reviewers to see the `awaiting_review` queue, view AI recommendations with reasoning, and submit decisions without using curl commands.
+8. ~~**Reviewer Dashboard**~~ — ✓ Implemented in `web/` directory. A Next.js dashboard for viewing issues, filtering by status, and submitting human reviews.
 
 9. **Production Deployment Guide** — Document production deployment with build steps, environment configuration, process management (PM2/systemd), health checks, and scaling considerations.
 
@@ -169,7 +169,22 @@ Start the worker (in a separate terminal):
 npm run worker:dev
 ```
 
-### 5. Test the Pipeline
+### 5. Run the Web Dashboard (Optional)
+
+Start the Next.js frontend for reviewing issues (in a separate terminal):
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+Open http://localhost:3001 to access the dashboard. Features:
+- View paginated list of issues with status/type filters
+- Click an issue to see full details and processing history
+- Submit human reviews for issues in `awaiting_review` status
+
+### 6. Test the Pipeline
 
 Run the sample ingestion script to verify everything works:
 

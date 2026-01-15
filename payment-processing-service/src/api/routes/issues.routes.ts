@@ -168,6 +168,9 @@ export async function issueRoutes(app: FastifyInstance): Promise<void> {
                   type: { type: 'string' },
                   status: { type: 'string' },
                   priority: { type: 'string' },
+                  automated_decision: { type: 'string', nullable: true },
+                  human_decision: { type: 'string', nullable: true },
+                  final_resolution: { type: 'string', nullable: true },
                   created_at: { type: 'string' },
                   updated_at: { type: 'string' },
                 },
@@ -208,7 +211,13 @@ export async function issueRoutes(app: FastifyInstance): Promise<void> {
         properties: {
           decision: {
             type: 'string',
-            enum: ['approve_retry', 'approve_refund', 'reject', 'escalate'],
+            enum: [
+              'retry_payment', 'block_card',           // decline
+              'approve_refund', 'deny_refund',         // refund_request
+              'accept_dispute', 'contest_dispute',     // dispute
+              'send_reminder', 'charge_late_fee',      // missed_installment
+              'escalate',                              // common
+            ],
           },
           reason: { type: 'string', minLength: 1, maxLength: 1000 },
           reviewer_email: { type: 'string', format: 'email' },
