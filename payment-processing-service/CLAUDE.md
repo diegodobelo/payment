@@ -30,8 +30,7 @@ npm run db:studio     # Open Drizzle Studio GUI
 # Infrastructure (PostgreSQL + Redis)
 docker-compose up -d
 
-# Demo & Ingestion Scripts
-npm run process-samples           # Demo in-memory processing (no DB changes)
+# Ingestion Script
 npm run ingest-samples            # Full pipeline demo via API
 npm run ingest-samples -- -c      # Clear database first, then run
 npm run ingest-samples -- --clear # Same as -c

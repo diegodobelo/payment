@@ -18,7 +18,6 @@
     "db:seed": "tsx src/db/seed.ts",
     "db:studio": "drizzle-kit studio",
         "typecheck": "tsc --noEmit",
-    "process-samples": "tsx scripts/process-sample-issues.ts",
     "ingest-samples": "tsx scripts/ingest-sample-issues.ts",
     "archive-issues": "tsx scripts/archive-issues.ts",
     "partition-issues": "tsx scripts/partition-issues.ts"

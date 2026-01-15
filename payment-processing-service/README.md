@@ -22,8 +22,8 @@ Automated payment issue processing service with decision engine and asynchronous
   │        │      │  API Server │      │   Queue     │      │   Process    │
   └────────┘      └─────────────┘      └─────────────┘      └──────────────┘
                         │                    │                     │
-                        │ validate &         │ persist             │ process
-                        │ enqueue            │ jobs                │ issues
+                        │ create issue       │ persist             │ process
+                        │ & enqueue          │ jobs                │ issues
                         ▼                    ▼                     ▼
                   ┌──────────┐         ┌──────────┐         ┌──────────────┐
                   │PostgreSQL│         │  Redis   │         │   Decision   │
@@ -43,7 +43,7 @@ Automated payment issue processing service with decision engine and asynchronous
 2. **API Server** validates request, creates issue record (status: `pending`), enqueues job
 3. **Queue** persists job to Redis with priority and retry configuration
 4. **Worker** picks up job, updates status to `processing`, fetches context (customer, transaction)
-5. **Decision Engine** evaluates issue using rules or AI, returns decision with confidence
+5. **Decision Engine** evaluates issue using local rules or AI, returns decision with confidence
 6. **Worker** updates issue with decision, sets final status (`resolved`, `awaiting_review`, or `failed`)
 7. **Client** polls `GET /api/v1/issues/:id` to check status and retrieve results
 
@@ -81,17 +81,132 @@ PII fields (customer email/name, payment methods) are encrypted at the applicati
 
 The retry configuration (5 attempts with exponential backoff starting at 2 seconds) handles transient failures gracefully. Each retry is logged, and after exhausting retries, the job moves to the "failed" state where it can be manually inspected and requeued. The issue status is updated to `failed` with the error message preserved in the database.
 
-**AI API Downtime:** If the Anthropic API is unavailable, jobs will retry with exponential backoff (2s → 4s → 8s → 16s → 32s) before failing after 5 attempts. During a 1-hour outage, most jobs would exhaust retries and fail. To improve resilience, we could add: (1) a circuit breaker that detects consecutive API failures and switches to a degraded mode (either fail-fast or fall back to rules-based decisions), (2) longer retry windows with more attempts for AI-mode jobs specifically, or (3) a "pause processing" mechanism that holds jobs in the queue without consuming retry attempts until the API recovers.
+**AI API Downtime:** If the Anthropic API is unavailable, jobs will retry with exponential backoff (2s → 4s → 8s → 16s → 32s) before failing after 5 attempts. During a 1-hour outage, most jobs would exhaust retries and fail. To improve resilience, we could add: (1) a circuit breaker that detects consecutive API failures and switches to a degraded mode (either fail-fast or fall back to local rules-based decisions), (2) longer retry windows with more attempts for AI-mode jobs specifically, or (3) a "pause processing" mechanism that holds jobs in the queue without consuming retry attempts until the API recovers.
 
 #### Agent Architecture
 
-**Why Skill-Per-Policy:** We chose to implement each policy domain (decline, dispute, refund, installment) as a separate Claude skill file rather than a single monolithic prompt. This separation provides several benefits: each policy is self-contained and human-readable, making it easy for non-engineers (product managers, compliance officers) to review and suggest changes. Policy updates are isolated—changing refund rules doesn't risk breaking dispute handling. The skill files serve as living documentation of business logic, versioned alongside the code.
+The service supports two decision engine modes: **local rules-based** and **AI-powered**. The mode is controlled by the `DECISION_ENGINE_MODE` environment variable.
+
+```
+Issue → Router → [Specialized Agent + Skill] → Decision
+                        ↓
+              Uses: decline-policy.md
+                    dispute-policy.md
+                    refund-policy.md
+                    installment-policy.md
+```
+
+This service uses [Claude Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) to implement its AI decision engine. Skills are folders of instructions, scripts, and resources that Claude loads dynamically to perform specialized tasks. They teach Claude how to complete specific tasks in a repeatable way—in this case, evaluating payment issues according to business policies.
+
+The Skills specification is published as an [open standard](https://agentskills.io), meaning skills aren't locked to Claude and can work across AI platforms that adopt the standard.
+
+##### Why Skills?
+
+We chose to implement each policy domain (decline, dispute, refund, installment) as a separate Claude skill file rather than a single monolithic prompt. This separation provides several benefits: each policy is self-contained and human-readable, making it easy for non-engineers (product managers, compliance officers) to review and suggest changes. Policy updates are isolated—changing refund rules doesn't risk breaking dispute handling. The skill files serve as living documentation of business logic, versioned alongside the code.
 
 The router pattern (`decisionEngineRouter.ts`) examines the issue type and loads the appropriate skill, constructing a focused prompt with only the relevant policy. This keeps prompts concise (better AI performance, lower token costs) and makes debugging straightforward—we know exactly which policy was applied from the `policyApplied` field in the response.
 
+1. **Separation of concerns** - Each policy domain is a self-contained markdown file
+2. **Easy to update** - Policy changes require editing a skill file, not code
+3. **No code deployment for policy updates** - Skills are loaded at runtime
+4. **Human readable** - Non-engineers can review and suggest policy changes
+5. **Future-ready for ensemble voting** - Each skill can become a voting agent
+
+##### Skill Files
+
+Skills are stored in `.claude/skills/`:
+
+| Skill | Purpose |
+|-------|---------|
+| `decline-policy.md` | Handles payment decline issues (insufficient funds, expired card) |
+| `dispute-policy.md` | Handles customer disputes (item not received, unauthorized) |
+| `refund-policy.md` | Handles refund requests (changed mind, defective) |
+| `installment-policy.md` | Handles missed installment payments |
+
+##### Confidence-Based Routing
+
+| Confidence | Action |
+|------------|--------|
+| ≥ 90% | Auto-execute the recommendation |
+| 70-89% | Queue for human review |
+| < 70% | Queue for human decision (escalate) |
+
+##### Error Handling & Resilience
+
+The system is designed to be resilient to AI failures. Jobs that fail are automatically retried with exponential backoff:
+
+```typescript
+defaultJobOptions: {
+  attempts: config.queue.maxRetries,     // Default: 3 attempts
+  backoff: {
+    type: 'exponential',
+    delay: config.queue.backoffDelayMs,  // e.g., 2s → 4s → 8s
+  },
+}
+```
+
+##### Fallback to Local Rules Engine
+
+If the AI API fails or times out, the system automatically falls back to the local rules-based engine:
+
+```typescript
+if (mode === 'ai') {
+  try {
+    const aiDecision = await evaluateWithAI(issue, customer, transaction);
+    return aiDecisionToUnified(aiDecision);
+  } catch (error) {
+    log.error({ err: error }, 'AI decision engine failed, falling back to rules');
+    const rulesDecision = evaluateWithRules(issue, customer, transaction);
+    return rulesDecisionToUnified(rulesDecision);
+  }
+}
+```
+
+##### Non-Retryable Errors
+
+Some errors skip retries entirely (`NonRetryableError`):
+- Issue not found
+- Customer not found
+- Transaction not found
+
+These are data problems that won't be fixed by retrying.
+
+##### Failure Recovery Flow
+
+```
+AI Request
+    ↓
+[Timeout/Error?] ──Yes──▶ Fallback to Local Rules Engine ──▶ Continue Processing
+    │
+   No
+    ↓
+[Success] ──▶ Continue Processing
+    ↓
+[Job-level failure?] ──Yes──▶ BullMQ retries (exponential backoff)
+    │                              ↓
+   No                    [All retries exhausted?] ──▶ Job marked as failed
+    ↓
+ Done
+```
+
+This ensures AI failures don't block processing—the local rules engine provides a deterministic fallback.
+
+##### Switching Between Modes
+
+**Local rules mode (default):**
+```bash
+DECISION_ENGINE_MODE=rules
+```
+
+**AI mode:**
+```bash
+DECISION_ENGINE_MODE=ai
+ANTHROPIC_API_KEY=your-api-key
+```
+
 **Single Agent Alternative:** A colleague might argue that a single "payment issue expert" agent with all policies in one prompt would be simpler—one file to maintain, no routing logic, potentially better cross-policy reasoning. This is valid for small policy sets, but becomes problematic as policies grow. A single prompt containing 4+ detailed policy documents would be harder to maintain, slower to iterate on, and more expensive per API call. The skill approach also positions us for future **ensemble voting**: multiple specialized agents could evaluate the same issue independently, with an arbiter combining their recommendations. This architecture is common in high-stakes decision systems where we want to catch edge cases that any single model might miss.
 
-### What You'd Do Differently
+### Future work
 
 With more time, these improvements would have the highest impact, in priority order:
 
@@ -99,9 +214,9 @@ With more time, these improvements would have the highest impact, in priority or
 
 2. **Dead Letter Queue & Admin Visibility** — Failed jobs disappear into BullMQ's failed state with no easy way to inspect, retry, or alert on them. A dead letter queue with a simple admin UI would let operators see why jobs failed and retry them with one click.
 
-3. **Metrics & Observability** — Add Prometheus metrics for job processing time, queue depth, decision engine latency, and AI API error rates. Integrate with Grafana for dashboards and PagerDuty for alerting on anomalies.
+3. **Metrics & Observability** — Add Prometheus metrics for job processing time, queue depth, decision engine latency, and AI API error rates. Integrate with Grafana for dashboards and PagerDuty for alerting on anomalies, for example.
 
-4. **Circuit Breaker for AI API** — Implement a circuit breaker (like `opossum`) that trips after N consecutive AI API failures, immediately failing new requests (or falling back to rules) instead of waiting for timeouts. This prevents queue backup during outages.
+4. **Circuit Breaker for AI API** — Implement a circuit breaker (like `opossum`) that trips after N consecutive AI API failures, immediately failing new requests (or falling back to local rules) instead of waiting for timeouts. This prevents queue backup during outages.
 
 5. **Batch Processing** — For high-volume scenarios, process similar issues in batches. Multiple decline issues for the same customer could be evaluated together, reducing API calls and enabling cross-issue reasoning.
 
@@ -109,9 +224,15 @@ With more time, these improvements would have the highest impact, in priority or
 
 7. **Event-Driven Notifications** — Emit events (via webhooks or message queue) when issues change status. External systems could subscribe to trigger customer notifications, update dashboards, or sync with support tools.
 
-8. ~~**Reviewer Dashboard**~~ — ✓ Implemented in `web/` directory. A Next.js dashboard for viewing issues, filtering by status, and submitting human reviews.
+8. **Production Deployment Guide** — Document production deployment with build steps, environment configuration, process management (PM2/systemd), health checks, and scaling considerations.
 
-9. **Production Deployment Guide** — Document production deployment with build steps, environment configuration, process management (PM2/systemd), health checks, and scaling considerations.
+9. **Future: Ensemble Voting** - The architecture is designed to support multiple policy agents voting on decisions:
+
+```
+Issue → [Multiple Skills in parallel] → Arbiter → Weighted Decision
+```
+
+Each skill would return a weighted vote, and an arbiter skill would combine them for the final decision.
 
 ## Local Development
 
@@ -195,7 +316,7 @@ npm run ingest-samples -- -c
 The `-c` flag clears the database first. This script:
 
 1. Seeds sample customers and transactions from `sample_data/`
-2. Creates 6 payment issues via the API (declines, disputes, refunds, missed installments)
+2. Creates 5 payment issues via the API (declines, disputes, refunds, missed installments)
 3. Waits for the worker to process each issue through the decision engine
 4. Displays results showing the automated decision and routing
 
@@ -232,7 +353,7 @@ Issues route based on confidence: ≥90% auto-resolves, 70-89% needs human revie
 | `npm run db:studio` | Open Drizzle Studio (database GUI) |
 | `npm run lint` | Run ESLint |
 | `npm run typecheck` | Type-check without emitting |
-| `npm run process-samples` | Run sample issues through decision engine |
+| `npm run ingest-samples` | Run sample issues through end-to-end pipeline |
 | `npm run archive-issues` | Archive resolved issues to cold storage |
 | `npm run partition-issues` | Partition issues table for scaling |
 
@@ -411,82 +532,6 @@ curl -X POST http://localhost:3000/api/v1/issues \
 - `GET /health/ready` - Readiness check with dependencies
 - `GET /docs` - Swagger UI documentation
 
-## AI Decision Engine Architecture
-
-The service supports two decision engine modes: **rules-based** and **AI-powered**. The mode is controlled by the `DECISION_ENGINE_MODE` environment variable.
-
-### Architecture: Option C with Skills
-
-```
-Issue → Router → [Specialized Agent + Skill] → Decision
-                        ↓
-              Uses: decline-policy.md
-                    dispute-policy.md
-                    refund-policy.md
-                    installment-policy.md
-```
-
-### Why Skills?
-
-We chose Claude Skills for the following reasons:
-
-1. **Separation of concerns** - Each policy domain is a self-contained markdown file
-2. **Easy to update** - Policy changes require editing a skill file, not code
-3. **No code deployment for policy updates** - Skills are loaded at runtime
-4. **Human readable** - Non-engineers can review and suggest policy changes
-5. **Future-ready for ensemble voting** - Each skill can become a voting agent
-
-### Skill Files
-
-Skills are stored in `.claude/skills/`:
-
-| Skill | Purpose |
-|-------|---------|
-| `decline-policy.md` | Handles payment decline issues (insufficient funds, expired card) |
-| `dispute-policy.md` | Handles customer disputes (item not received, unauthorized) |
-| `refund-policy.md` | Handles refund requests (changed mind, defective) |
-| `installment-policy.md` | Handles missed installment payments |
-
-### Confidence-Based Routing
-
-| Confidence | Action |
-|------------|--------|
-| ≥ 90% | Auto-execute the recommendation |
-| 70-89% | Queue for human review |
-| < 70% | Queue for human decision (escalate) |
-
-### Switching Between Modes
-
-**Rules mode (default):**
-```bash
-DECISION_ENGINE_MODE=rules
-```
-
-**AI mode:**
-```bash
-DECISION_ENGINE_MODE=ai
-ANTHROPIC_API_KEY=your-api-key
-```
-
-### Processing Sample Issues
-
-Run the demo script to see how issues are processed:
-
-```bash
-npm run process-samples
-```
-
-Output:
-```
-| Issue ID  | Type               | Decision      | Confidence | Routing       |
-|-----------|--------------------|--------------:|:----------:|---------------|
-| iss_001   | decline            | approve_retry |        85% | auto_resolve  |
-| iss_002   | missed_installment | approve_retry |        75% | human_review  |
-| iss_003   | dispute            |      escalate |        40% | escalate      |
-| iss_004   | refund_request     |      escalate |        55% | escalate      |
-| iss_005   | decline            | approve_retry |        90% | auto_resolve  |
-```
-
 ### Adding New Policy Skills
 
 1. Create a new skill file in `.claude/skills/`:
@@ -522,15 +567,6 @@ The system tracks AI vs human decision agreement in the `decision_analytics` tab
 
 This data helps measure AI accuracy and identify areas for policy improvement.
 
-### Future: Ensemble Voting
-
-The architecture is designed to support multiple policy agents voting on decisions:
-
-```
-Issue → [Multiple Skills in parallel] → Arbiter → Weighted Decision
-```
-
-Each skill would return a weighted vote, and an arbiter skill would combine them for the final decision.
 
 ## Environment Variables
 
