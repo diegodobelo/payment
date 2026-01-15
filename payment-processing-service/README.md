@@ -120,7 +120,7 @@ Schema defined using [Drizzle ORM](https://orm.drizzle.team/) in `src/db/schema/
 
 ### Trade-offs & Decisions
 
-#### Database Schema
+#### Schema Design
 
 The schema prioritizes **flexibility and compliance** over query simplicity. The `details` column uses JSONB to store issue-type-specific data (decline error codes, dispute reasons, installment info) rather than creating separate tables or nullable columns for each type. This allows adding new issue types without schema migrations, but sacrifices type safety at the database level—validation happens in the application via Zod schemas instead.
 
@@ -135,6 +135,35 @@ PII fields (customer email/name, payment methods) are encrypted at the applicati
 The retry configuration (5 attempts with exponential backoff starting at 2 seconds) handles transient failures gracefully. Each retry is logged, and after exhausting retries, the job moves to the "failed" state where it can be manually inspected and requeued. The issue status is updated to `failed` with the error message preserved in the database.
 
 **AI API Downtime:** If the Anthropic API is unavailable, jobs will retry with exponential backoff (2s → 4s → 8s → 16s → 32s) before failing after 5 attempts. During a 1-hour outage, most jobs would exhaust retries and fail. To improve resilience, we could add: (1) a circuit breaker that detects consecutive API failures and switches to a degraded mode (either fail-fast or fall back to local rules-based decisions), (2) longer retry windows with more attempts for AI-mode jobs specifically, or (3) a "pause processing" mechanism that holds jobs in the queue without consuming retry attempts until the API recovers.
+
+#### Scaling
+
+**Processing Throughput:**
+
+| Mode | Per Issue | 1 Worker (5 concurrent) | Max/Day |
+|------|-----------|-------------------------|---------|
+| Local Rules | ~100ms | 3,000/min | 4.3M |
+| AI | ~10s | 30/min | 43,200 |
+
+At 10,000 issues/day (~7/minute average), a single worker handles the load comfortably in either mode. AI mode would process the full day's issues in ~5.5 hours, leaving headroom for traffic spikes.
+
+**Horizontal Scaling:**
+
+Workers scale horizontally—each additional worker process adds 5 concurrent jobs. For higher throughput or redundancy:
+
+```bash
+# Terminal 1
+npm run worker
+
+# Terminal 2 (separate machine or container)
+npm run worker
+```
+
+Two workers double throughput to 60 issues/minute (AI) or 6,000/minute (local rules). In production, run workers as separate containers/pods with health checks.
+
+**Database Scaling:**
+
+For query performance at scale, the service includes table partitioning, automatic archival, and read replica support. See [Database Scaling](#database-scaling) for configuration.
 
 #### Agent Architecture
 
