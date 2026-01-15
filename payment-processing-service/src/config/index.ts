@@ -11,6 +11,7 @@ const configSchema = z.object({
 
   database: z.object({
     url: z.string().min(1, 'DATABASE_URL is required'),
+    replicaUrl: z.string().optional(), // Read replica for reporting queries
     poolMax: z.coerce.number().default(10),
   }),
 
@@ -54,6 +55,23 @@ const configSchema = z.object({
   shutdown: z.object({
     timeoutMs: z.coerce.number().default(30000),
   }),
+
+  // Maintenance jobs
+  maintenance: z.object({
+    enabled: z.coerce.boolean().default(true),
+    archival: z.object({
+      // Archive issues older than this many days
+      olderThanDays: z.coerce.number().default(30),
+      // Purge archived issues older than this many days (default 2 years)
+      purgeAfterDays: z.coerce.number().default(730),
+      // Cron schedule for archival job (default: daily at 2 AM)
+      schedule: z.string().default('0 2 * * *'),
+    }),
+    partition: z.object({
+      // Cron schedule for partition creation (default: 1st of month at 3 AM)
+      schedule: z.string().default('0 3 1 * *'),
+    }),
+  }),
 });
 
 const configInput = {
@@ -63,6 +81,7 @@ const configInput = {
 
   database: {
     url: process.env['DATABASE_URL'],
+    replicaUrl: process.env['DATABASE_REPLICA_URL'],
     poolMax: process.env['DATABASE_POOL_MAX'],
   },
 
@@ -100,6 +119,18 @@ const configInput = {
 
   shutdown: {
     timeoutMs: process.env['SHUTDOWN_TIMEOUT_MS'],
+  },
+
+  maintenance: {
+    enabled: process.env['MAINTENANCE_ENABLED'],
+    archival: {
+      olderThanDays: process.env['MAINTENANCE_ARCHIVE_OLDER_THAN_DAYS'],
+      purgeAfterDays: process.env['MAINTENANCE_ARCHIVE_PURGE_AFTER_DAYS'],
+      schedule: process.env['MAINTENANCE_ARCHIVE_SCHEDULE'],
+    },
+    partition: {
+      schedule: process.env['MAINTENANCE_PARTITION_SCHEDULE'],
+    },
   },
 };
 

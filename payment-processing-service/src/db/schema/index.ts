@@ -5,6 +5,7 @@ export * from './enums';
 export * from './customers';
 export * from './transactions';
 export * from './issues';
+export * from './issuesArchive';
 export * from './statusHistory';
 export * from './auditLogs';
 export * from './decisionAnalytics';
@@ -13,6 +14,7 @@ export * from './decisionAnalytics';
 import { customers } from './customers';
 import { transactions } from './transactions';
 import { issues } from './issues';
+import { issuesArchive } from './issuesArchive';
 import { statusHistory } from './statusHistory';
 import { auditLogs } from './auditLogs';
 import { decisionAnalytics } from './decisionAnalytics';
@@ -21,6 +23,7 @@ export const schema = {
   customers,
   transactions,
   issues,
+  issuesArchive,
   statusHistory,
   auditLogs,
   decisionAnalytics,

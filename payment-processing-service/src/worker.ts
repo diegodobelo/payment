@@ -2,9 +2,15 @@ import { logger } from './lib/logger.js';
 import { closeRedis, testRedisConnection } from './lib/redis.js';
 import { closeDatabase, testConnection } from './db/client.js';
 import { closeQueue } from './queue/queueManager.js';
+import {
+  closeMaintenanceQueue,
+  registerScheduledJobs,
+} from './queue/maintenanceQueue.js';
 import { createWorker, type Worker } from './queue/workers/issueProcessor.worker.js';
+import { createMaintenanceWorker } from './queue/workers/maintenance.worker.js';
 
 let worker: Worker | null = null;
+let maintenanceWorker: Worker | null = null;
 let isShuttingDown = false;
 
 /**
@@ -32,29 +38,43 @@ async function gracefulShutdown(signal: string): Promise<void> {
   try {
     await Promise.race([
       (async () => {
+        // Pause all workers
         if (worker) {
-          // 1. Pause the worker (stop accepting new jobs)
           await worker.pause();
-          logger.info('Worker paused');
-
-          // 2. Wait for active jobs to complete
-          logger.info('Waiting for active jobs to complete...');
-          while (await worker.isRunning()) {
-            if (Date.now() - startTime > shutdownTimeout - 5000) {
-              logger.warn('Approaching timeout, forcing worker close');
-              break;
-            }
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-          }
-
-          // 3. Close the worker
-          await worker.close();
-          logger.info('Worker closed');
+          logger.info('Issue worker paused');
+        }
+        if (maintenanceWorker) {
+          await maintenanceWorker.pause();
+          logger.info('Maintenance worker paused');
         }
 
-        // 4. Close the queue
+        // Wait for active jobs to complete
+        logger.info('Waiting for active jobs to complete...');
+        while (
+          (worker && (await worker.isRunning())) ||
+          (maintenanceWorker && (await maintenanceWorker.isRunning()))
+        ) {
+          if (Date.now() - startTime > shutdownTimeout - 5000) {
+            logger.warn('Approaching timeout, forcing worker close');
+            break;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+
+        // Close workers
+        if (worker) {
+          await worker.close();
+          logger.info('Issue worker closed');
+        }
+        if (maintenanceWorker) {
+          await maintenanceWorker.close();
+          logger.info('Maintenance worker closed');
+        }
+
+        // Close queues
         await closeQueue();
-        logger.info('Queue closed');
+        await closeMaintenanceQueue();
+        logger.info('Queues closed');
 
         // 5. Close database connections
         await closeDatabase();
@@ -101,10 +121,18 @@ async function main(): Promise<void> {
     }
     logger.info('Redis connection successful');
 
-    // Create and start the worker
+    // Create and start the issue processor worker
     worker = createWorker();
+    logger.info('Issue processor worker started');
 
-    logger.info('Worker started successfully');
+    // Create and start the maintenance worker
+    maintenanceWorker = createMaintenanceWorker();
+    logger.info('Maintenance worker started');
+
+    // Register scheduled maintenance jobs
+    await registerScheduledJobs();
+
+    logger.info('All workers started successfully');
 
     // Setup graceful shutdown handlers
     process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));

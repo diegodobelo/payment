@@ -1,5 +1,6 @@
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
+import { dbReplica } from '../db/replica.js';
 import {
   decisionAnalytics,
   type DecisionAnalyticsEntry,
@@ -104,6 +105,7 @@ export async function findByIssueId(
 
 /**
  * Get agreement statistics for AI decisions.
+ * Uses read replica for better performance on reporting queries.
  */
 export async function getAgreementStats(): Promise<{
   total: number;
@@ -112,33 +114,25 @@ export async function getAgreementStats(): Promise<{
   rejected: number;
   pending: number;
 }> {
-  const all = await db.select().from(decisionAnalytics);
+  // Use SQL aggregation on replica for efficient counting
+  const result = await dbReplica
+    .select({
+      total: sql<number>`count(*)::int`,
+      agreed: sql<number>`count(*) filter (where ${decisionAnalytics.agreement} = 'agreed')::int`,
+      modified: sql<number>`count(*) filter (where ${decisionAnalytics.agreement} = 'modified')::int`,
+      rejected: sql<number>`count(*) filter (where ${decisionAnalytics.agreement} = 'rejected')::int`,
+      pending: sql<number>`count(*) filter (where ${decisionAnalytics.agreement} is null)::int`,
+    })
+    .from(decisionAnalytics);
 
-  const stats = {
-    total: all.length,
-    agreed: 0,
-    modified: 0,
-    rejected: 0,
-    pending: 0,
+  const row = result[0];
+  return {
+    total: row?.total ?? 0,
+    agreed: row?.agreed ?? 0,
+    modified: row?.modified ?? 0,
+    rejected: row?.rejected ?? 0,
+    pending: row?.pending ?? 0,
   };
-
-  for (const entry of all) {
-    switch (entry.agreement) {
-      case 'agreed':
-        stats.agreed++;
-        break;
-      case 'modified':
-        stats.modified++;
-        break;
-      case 'rejected':
-        stats.rejected++;
-        break;
-      default:
-        stats.pending++;
-    }
-  }
-
-  return stats;
 }
 
 export const decisionAnalyticsRepository = {

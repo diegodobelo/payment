@@ -73,7 +73,7 @@ The schema prioritizes **flexibility and compliance** over query simplicity. The
 
 PII fields (customer email/name, payment methods) are encrypted at the application layer using AES-256-GCM rather than database-level encryption (like `pgcrypto`). This means encrypted data is opaque to PostgreSQL—we can't query by email or build indexes on names. The trade-off is worth it: application-level encryption lets us control key management, implement field-level access logging, and avoid exposing plaintext to database backups or admin tools. The `audit_logs` table is separate from `issues` to maintain a clean append-only compliance trail, though this means joining tables to correlate changes.
 
-**Scaling to 10,000 issues/day:** At this volume (~7 issues/minute), the current schema would need adjustments. First, partition the `issues` table by `created_at` (monthly or weekly) to keep index sizes manageable and enable efficient archival. Second, move `audit_logs` to a time-series database (TimescaleDB, or a separate PostgreSQL instance) since audit volume grows faster than issues and has different query patterns (mostly time-range scans). Third, add read replicas for reporting queries (`decision_analytics` aggregations, issue listings) to avoid impacting write throughput. Finally, implement an archival job to move resolved issues older than the retention period to cold storage.
+**Scaling to 10,000 issues/day:** At this volume (~7 issues/minute), the service includes infrastructure for scaling (see [Database Scaling](#database-scaling)): table partitioning by `created_at` for efficient queries on recent data, TimescaleDB hypertables for audit logs with automatic compression and retention, read replica support for reporting queries, and scheduled archival jobs that move resolved issues to cold storage and purge old archives. These features run automatically via the worker process.
 
 #### Queue Design
 
@@ -155,7 +155,17 @@ npm install
 npm run db:migrate
 ```
 
-### 4. Run the Service
+### 4. Enable TimescaleDB (Optional)
+
+For time-series optimizations on audit logs (automatic compression and retention):
+
+```bash
+npm run setup-timescaledb
+```
+
+This is optional for development but recommended for production.
+
+### 5. Run the Service
 
 Start the development server:
 
@@ -169,7 +179,7 @@ Start the worker (in a separate terminal):
 npm run worker:dev
 ```
 
-### 5. Test the Pipeline
+### 6. Test the Pipeline
 
 Run the sample ingestion script to verify everything works:
 
@@ -218,6 +228,9 @@ Issues route based on confidence: ≥90% auto-resolves, 70-89% needs human revie
 | `npm run lint` | Run ESLint |
 | `npm run typecheck` | Type-check without emitting |
 | `npm run process-samples` | Run sample issues through decision engine |
+| `npm run archive-issues` | Archive resolved issues to cold storage |
+| `npm run setup-timescaledb` | Enable TimescaleDB features for audit logs |
+| `npm run partition-issues` | Partition issues table for scaling |
 
 ## Security
 
@@ -245,6 +258,89 @@ The logger automatically redacts sensitive information:
 - Email and name fields
 - Payment method details
 - Encryption keys
+
+## Database Scaling
+
+For high-volume deployments (10,000+ issues/day), the service includes infrastructure for scaling:
+
+### Issue Archival
+
+Move old resolved issues to an archive table to keep the main `issues` table performant.
+
+**Automatic:** The worker runs archival daily at 2 AM (configurable via `MAINTENANCE_ARCHIVE_SCHEDULE`). Archives older than 2 years are automatically purged.
+
+**Manual:** Run archival on-demand:
+
+```bash
+# Archive issues resolved more than 30 days ago
+npm run archive-issues
+
+# Preview what would be archived
+npm run archive-issues -- --dry-run
+
+# Archive issues older than 60 days
+npm run archive-issues -- -d 60
+
+# Also purge archives older than 2 years
+npm run archive-issues -- --purge
+
+# Show archive statistics
+npm run archive-issues -- --stats
+```
+
+Archived issues are preserved in `issues_archive` for compliance and can still be queried.
+
+### TimescaleDB for Audit Logs
+
+The docker-compose uses TimescaleDB for time-series optimizations on `audit_logs`:
+
+```bash
+# After starting infrastructure, enable TimescaleDB features
+npm run setup-timescaledb
+```
+
+This configures:
+- Automatic chunking (1-day intervals)
+- Compression policy (chunks older than 7 days)
+- Retention policy (drop chunks older than 90 days)
+
+### Table Partitioning
+
+Partition the `issues` table by `created_at` for efficient queries on recent data.
+
+**Initial setup** (one-time migration):
+
+```bash
+# Preview without making changes
+npm run partition-issues -- --dry-run
+
+# Migrate existing table to partitioned structure
+npm run partition-issues
+```
+
+**Automatic:** Once partitioned, the worker creates future partitions on the 1st of each month (configurable via `MAINTENANCE_PARTITION_SCHEDULE`).
+
+**Manual:** Create partitions on-demand:
+
+```bash
+npm run partition-issues -- --create-future
+```
+
+### Read Replicas
+
+A read replica is a read-only copy of your database that stays synchronized with the primary. By directing analytics and reporting queries to the replica, you prevent heavy read operations from slowing down writes on the main database.
+
+Configure a replica by setting:
+
+```env
+DATABASE_REPLICA_URL=postgresql://user:pass@replica-host:5432/payment_issues
+```
+
+The `decisionAnalyticsRepository` automatically uses the replica for aggregation queries when configured.
+
+**Production setup:** Use PostgreSQL streaming replication or a managed service (AWS RDS, Cloud SQL) that provides read replicas.
+
+**Local development:** This is optional—the service falls back to the primary database if no replica is configured.
 
 ## API Usage
 
@@ -459,6 +555,7 @@ Copy `.env.example` to `.env` and configure the following variables:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `DATABASE_URL` | PostgreSQL connection string | `postgresql://postgres:postgres@localhost:5432/payment_issues` |
+| `DATABASE_REPLICA_URL` | Read replica connection (optional, for reporting queries) | - |
 | `DATABASE_POOL_MAX` | Maximum pool connections | `10` |
 
 ### Redis
@@ -509,3 +606,13 @@ openssl rand -hex 32
 |----------|-------------|---------|
 | `HEALTH_CHECK_TIMEOUT_MS` | Health check timeout (ms) | `2000` |
 | `SHUTDOWN_TIMEOUT_MS` | Graceful shutdown timeout (ms) | `30000` |
+
+### Maintenance Jobs
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `MAINTENANCE_ENABLED` | Enable scheduled maintenance jobs | `true` |
+| `MAINTENANCE_ARCHIVE_OLDER_THAN_DAYS` | Archive issues older than N days | `30` |
+| `MAINTENANCE_ARCHIVE_PURGE_AFTER_DAYS` | Purge archives older than N days | `730` (2 years) |
+| `MAINTENANCE_ARCHIVE_SCHEDULE` | Cron schedule for archival | `0 2 * * *` (daily 2 AM) |
+| `MAINTENANCE_PARTITION_SCHEDULE` | Cron schedule for partition creation | `0 3 1 * *` (1st of month 3 AM) |

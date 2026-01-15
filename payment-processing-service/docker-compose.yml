@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    image: timescale/timescaledb:latest-pg16
     container_name: payment-issues-postgres
     environment:
       POSTGRES_DB: payment_issues
