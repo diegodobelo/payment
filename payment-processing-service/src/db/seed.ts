@@ -100,7 +100,7 @@ const customerIdMap = new Map<string, string>();
 const transactionIdMap = new Map<string, string>();
 
 async function loadSampleData(): Promise<void> {
-  const sampleDataPath = join(__dirname, '../../../sample_data');
+  const sampleDataPath = join(__dirname, '../../sample_data');
 
   logger.info('Loading sample data from: %s', sampleDataPath);
 

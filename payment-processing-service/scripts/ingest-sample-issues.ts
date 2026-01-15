@@ -127,7 +127,7 @@ const transactionIdMap = new Map<string, string>();
  * Load sample data from JSON files.
  */
 function loadSampleData() {
-  const sampleDataPath = join(__dirname, '../../sample_data');
+  const sampleDataPath = join(__dirname, '../sample_data');
 
   const customersData: RawCustomer[] = JSON.parse(
     readFileSync(join(sampleDataPath, 'customers.json'), 'utf-8')
