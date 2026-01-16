@@ -292,6 +292,10 @@ This ensures AI failures don't block processing—the local rules engine provide
 
 **Single Agent Alternative:** A colleague might argue that a single "payment issue expert" agent with all policies in one prompt would be simpler—one file to maintain, no routing logic, potentially better cross-policy reasoning. This is valid for small policy sets, but becomes problematic as policies grow. A single prompt containing 4+ detailed policy documents would be harder to maintain, slower to iterate on, and more expensive per API call. The separate policy approach also positions us for future **ensemble voting**: multiple specialized agents could evaluate the same issue independently, with an arbiter combining their recommendations. This architecture is common in high-stakes decision systems where we want to catch edge cases that any single model might miss.
 
+##### Is the use of a Triage System worth it?
+
+In the current version, issues are created and added to the database with priority "normal". The priority is not used anywhere. We could implement a triage system to prioritize issues in the worker queue, but we should consider whether it's worth the effort. If we use AI to determine the priority of an issue, we would essentially be doubling the resource usage—using AI once to determine priority and again to determine the decision/resolution. After all, all issues will eventually get processed, so the use of a triage system is debatable.
+
 ### Future work
 
 With more time, these improvements would have the highest impact, in priority order:
