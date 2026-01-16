@@ -7,6 +7,32 @@ import type { Issue, Customer, Transaction } from '../db/schema/index.js';
 import type { DecisionType } from '../db/schema/enums.js';
 
 /**
+ * Map issue types to their corresponding policy files.
+ */
+const POLICY_MAP: Record<string, string> = {
+  decline: 'decline-policy.md',
+  dispute: 'dispute-policy.md',
+  refund_request: 'refund-policy.md',
+  missed_installment: 'installment-policy.md',
+};
+
+/**
+ * Load a policy file for a given issue type.
+ */
+function loadPolicy(issueType: string): string {
+  const policyFile = POLICY_MAP[issueType];
+  if (!policyFile) {
+    throw new Error(`No policy defined for issue type: ${issueType}`);
+  }
+  const policyPath = join(process.cwd(), 'policies', policyFile);
+  try {
+    return readFileSync(policyPath, 'utf-8');
+  } catch {
+    throw new Error(`Failed to load policy file: ${policyPath}`);
+  }
+}
+
+/**
  * AI Decision result from the Claude Agent.
  */
 export interface AIDecision {
@@ -15,33 +41,6 @@ export interface AIDecision {
   confidence: number;
   reasoning: string;
   policyApplied: string;
-}
-
-/**
- * Map issue type to skill file name.
- */
-const SKILL_MAP: Record<string, string> = {
-  decline: 'decline-policy.md',
-  dispute: 'dispute-policy.md',
-  refund_request: 'refund-policy.md',
-  missed_installment: 'installment-policy.md',
-};
-
-/**
- * Load skill content from file.
- */
-function loadSkill(issueType: string): string {
-  const skillFile = SKILL_MAP[issueType];
-  if (!skillFile) {
-    throw new Error(`No skill defined for issue type: ${issueType}`);
-  }
-
-  const skillPath = join(process.cwd(), '.claude', 'skills', skillFile);
-  try {
-    return readFileSync(skillPath, 'utf-8');
-  } catch {
-    throw new Error(`Failed to load skill file: ${skillPath}`);
-  }
 }
 
 /**
@@ -156,24 +155,18 @@ export async function evaluateWithAI(
 
   log.info('Starting AI evaluation');
 
-  // Load the appropriate skill
-  const skillContent = loadSkill(issue.type);
+  // Load the appropriate policy for this issue type
+  const policy = loadPolicy(issue.type);
 
   // Build context
   const context = buildContext(issue, customer, transaction);
 
-  // Build prompt
-  const prompt = `${skillContent}
-
----
+  // Build prompt with policy content included
+  const prompt = `${policy}
 
 ## Issue Context
 
-${context}
-
----
-
-Analyze this issue and provide your decision in the specified JSON format.`;
+${context}`;
 
   // Capture stderr output for better error messages
   let stderrOutput = '';
@@ -181,12 +174,12 @@ Analyze this issue and provide your decision in the specified JSON format.`;
   try {
     let result = '';
 
-    // Call Claude Agent SDK with stderr callback
+    // Call Claude Agent SDK with policy loaded manually (single turn, no tools needed)
     for await (const message of query({
       prompt,
       options: {
-        allowedTools: [], // Read-only, no tools needed for policy decisions
-        maxTurns: 1, // Single turn for decision
+        allowedTools: [],  // No tools needed - policy is already loaded
+        maxTurns: 1,       // Single turn for efficiency
         stderr: (data: string) => {
           stderrOutput += data;
         },

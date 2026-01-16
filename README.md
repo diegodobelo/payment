@@ -187,7 +187,7 @@ For query performance at scale, the service includes table partitioning, automat
 The service supports two decision engine modes: **local rules-based** and **AI-powered**. The mode is controlled by the `DECISION_ENGINE_MODE` environment variable.
 
 ```
-Issue → Router → [Specialized Agent + Skill] → Decision
+Issue → Router → [Policy File] → Claude API → Decision
                         ↓
               Uses: decline-policy.md
                     dispute-policy.md
@@ -195,28 +195,28 @@ Issue → Router → [Specialized Agent + Skill] → Decision
                     installment-policy.md
 ```
 
-This service uses [Claude Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) to implement its AI decision engine. Skills are folders of instructions, scripts, and resources that Claude loads dynamically to perform specialized tasks. They teach Claude how to complete specific tasks in a repeatable way—in this case, evaluating payment issues according to business policies.
+The AI decision engine uses policy files to guide Claude's decision-making. Each policy file contains domain-specific rules, guidelines, and output format requirements that Claude follows when evaluating issues.
 
-The Skills specification is published as an [open standard](https://agentskills.io), meaning skills aren't locked to Claude and can work across AI platforms that adopt the standard.
+##### Why Separate Policy Files?
 
-##### Why Skills?
+We chose to implement each policy domain (decline, dispute, refund, installment) as a separate policy file rather than a single monolithic prompt. This separation provides several benefits: each policy is self-contained and human-readable, making it easy for non-engineers (product managers, compliance officers) to review and suggest changes. Policy updates are isolated—changing refund rules doesn't risk breaking dispute handling. The policy files serve as living documentation of business logic, versioned alongside the code.
 
-We chose to implement each policy domain (decline, dispute, refund, installment) as a separate Claude skill file rather than a single monolithic prompt. This separation provides several benefits: each policy is self-contained and human-readable, making it easy for non-engineers (product managers, compliance officers) to review and suggest changes. Policy updates are isolated—changing refund rules doesn't risk breaking dispute handling. The skill files serve as living documentation of business logic, versioned alongside the code.
+The router pattern (`decisionEngineRouter.ts`) examines the issue type and loads the appropriate policy, constructing a focused prompt with only the relevant rules. This keeps prompts concise (better AI performance, lower token costs) and makes debugging straightforward—we know exactly which policy was applied from the `policyApplied` field in the response.
 
-The router pattern (`decisionEngineRouter.ts`) examines the issue type and loads the appropriate skill, constructing a focused prompt with only the relevant policy. This keeps prompts concise (better AI performance, lower token costs) and makes debugging straightforward—we know exactly which policy was applied from the `policyApplied` field in the response.
+This mechanism mimics Claude Skills. We considered using Claude Skills but it takes several cycles to decide which skill to use, reaching the rate limit. Also, it takes more time to process and costs more.
 
 1. **Separation of concerns** - Each policy domain is a self-contained markdown file
-2. **Easy to update** - Policy changes require editing a skill file, not code
-3. **No code deployment for policy updates** - Skills are loaded at runtime
+2. **Easy to update** - Policy changes require editing a markdown file, not code
+3. **No code deployment for policy updates** - Policies are loaded at runtime
 4. **Human readable** - Non-engineers can review and suggest policy changes
-5. **Future-ready for ensemble voting** - Each skill can become a voting agent
+5. **Future-ready for ensemble voting** - Each policy can be evaluated by multiple agents
 
-##### Skill Files
+##### Policy Files
 
-Skills are stored in `.claude/skills/`:
+Policies are stored in `policies/`:
 
-| Skill | Purpose |
-|-------|---------|
+| Policy | Purpose |
+|--------|---------|
 | `decline-policy.md` | Handles payment decline issues (insufficient funds, expired card) |
 | `dispute-policy.md` | Handles customer disputes (item not received, unauthorized) |
 | `refund-policy.md` | Handles refund requests (changed mind, defective) |
@@ -290,7 +290,7 @@ AI Request
 
 This ensures AI failures don't block processing—the local rules engine provides a deterministic fallback.
 
-**Single Agent Alternative:** A colleague might argue that a single "payment issue expert" agent with all policies in one prompt would be simpler—one file to maintain, no routing logic, potentially better cross-policy reasoning. This is valid for small policy sets, but becomes problematic as policies grow. A single prompt containing 4+ detailed policy documents would be harder to maintain, slower to iterate on, and more expensive per API call. The skill approach also positions us for future **ensemble voting**: multiple specialized agents could evaluate the same issue independently, with an arbiter combining their recommendations. This architecture is common in high-stakes decision systems where we want to catch edge cases that any single model might miss.
+**Single Agent Alternative:** A colleague might argue that a single "payment issue expert" agent with all policies in one prompt would be simpler—one file to maintain, no routing logic, potentially better cross-policy reasoning. This is valid for small policy sets, but becomes problematic as policies grow. A single prompt containing 4+ detailed policy documents would be harder to maintain, slower to iterate on, and more expensive per API call. The separate policy approach also positions us for future **ensemble voting**: multiple specialized agents could evaluate the same issue independently, with an arbiter combining their recommendations. This architecture is common in high-stakes decision systems where we want to catch edge cases that any single model might miss.
 
 ### Future work
 
@@ -306,7 +306,7 @@ With more time, these improvements would have the highest impact, in priority or
 
 5. **Batch Processing** — For high-volume scenarios, process similar issues in batches. Multiple decline issues for the same customer could be evaluated together, reducing API calls and enabling cross-issue reasoning.
 
-6. **Policy Versioning** — Track which version of each skill file was used for each decision. This enables A/B testing of policy changes and debugging why a specific decision was made weeks later.
+6. **Policy Versioning** — Track which version of each policy file was used for each decision. This enables A/B testing of policy changes and debugging why a specific decision was made weeks later.
 
 7. **Event-Driven Notifications** — Emit events (via webhooks or message queue) when issues change status. External systems could subscribe to trigger customer notifications, update dashboards, or sync with support tools.
 
@@ -315,14 +315,14 @@ With more time, these improvements would have the highest impact, in priority or
 9. **Future: Ensemble Voting** - The architecture is designed to support multiple policy agents voting on decisions:
 
 ```
-Issue → [Multiple Skills or Agents in parallel] → Arbiter → Weighted Decision
+Issue → [Multiple Agents in parallel] → Arbiter → Weighted Decision
 ```
 
-Each skill or agent would return a weighted vote, and an arbiter skill would combine them for the final decision. For the agents we can use different providers, such as OpenAI, Google, DeepSeek, etc.
+Each agent would return a weighted vote, and an arbiter would combine them for the final decision. For the agents we can use different providers, such as OpenAI, Google, DeepSeek, etc.
 
 10. **Do not fallback to local rules when AI fails** - Use other agents as mentioned in 9. If all of them fails we can escalate the issue for a human review.
 
-11. **Single Source of Truth for Decision Types** — Decision types and actions are currently defined in multiple places: database enums (`src/db/schema/enums.ts`), AI policy files (`.claude/skills/*-policy.md`), web frontend types (`web/lib/types.ts`), and backend validation. Adding a new decision type requires updating all four locations. A better approach would be to expose an API endpoint (e.g., `/api/v1/config/decisions`) that returns valid options from the database enum, allowing the frontend and policy files to reference a single source of truth.
+11. **Single Source of Truth for Decision Types** — Decision types and actions are currently defined in multiple places: database enums (`src/db/schema/enums.ts`), AI policy files (`policies/*-policy.md`), web frontend types (`web/lib/types.ts`), and backend validation. Adding a new decision type requires updating all four locations. A better approach would be to expose an API endpoint (e.g., `/api/v1/config/decisions`) that returns valid options from the database enum, allowing the frontend and policy files to reference a single source of truth.
 
 ## Local Development
 
@@ -638,9 +638,9 @@ curl -X POST http://localhost:3000/api/v1/issues \
 - `GET /health/ready` - Readiness check with dependencies
 - `GET /docs` - Swagger UI documentation
 
-### Adding New Policy Skills
+### Adding New Policies
 
-1. Create a new skill file in `.claude/skills/`:
+1. Create a new policy file in `policies/`:
 
 ```markdown
 # My New Policy Handler
@@ -661,7 +661,7 @@ Return valid JSON:
 }
 ```
 
-2. Update `SKILL_MAP` in `src/services/aiDecisionEngine.ts`
+2. Update `POLICY_MAP` in `src/services/aiDecisionEngine.ts`
 
 ### Human Review Analytics
 
@@ -801,7 +801,7 @@ openssl rand -hex 32
 | [Pino](https://getpino.io/) | Fast JSON logger. Low overhead, structured logging with automatic redaction of sensitive fields. |
 | [ioredis](https://github.com/redis/ioredis) | Redis client for Node.js. Used by BullMQ for job queue persistence. |
 | [postgres](https://github.com/porsager/postgres) | PostgreSQL client. Fast, lightweight driver used with Drizzle ORM. |
-| [@anthropic-ai/claude-agent-sdk](https://github.com/anthropics/claude-code/tree/main/agent-sdk) | Claude Agent SDK for AI-powered decisions. Enables skill-based prompting and structured responses. |
+| [@anthropic-ai/claude-agent-sdk](https://github.com/anthropics/claude-code/tree/main/agent-sdk) | Claude Agent SDK for AI-powered decisions. Enables policy-based prompting and structured responses. |
 | [@fastify/swagger](https://github.com/fastify/fastify-swagger) | OpenAPI documentation generator. Auto-generates API docs from route schemas. |
 | [@fastify/rate-limit](https://github.com/fastify/fastify-rate-limit) | Rate limiting middleware. Protects API from abuse. |
 | [dotenv](https://github.com/motdotla/dotenv) | Environment variable loader. Loads `.env` files in development. |
