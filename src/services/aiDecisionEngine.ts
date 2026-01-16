@@ -4,7 +4,13 @@ import { join } from 'path';
 import { config } from '../config/index.js';
 import { logger } from '../lib/logger.js';
 import type { Issue, Customer, Transaction } from '../db/schema/index.js';
-import type { DecisionType } from '../db/schema/enums.js';
+import type { DecisionType, IssueType } from '../db/schema/enums.js';
+import {
+  ACTION_TYPES_BY_ISSUE,
+  getConfidenceGuidelines,
+  getGeneralGuidelines,
+  getOutputFormat,
+} from './policyTemplates.js';
 
 /**
  * Map issue types to their corresponding policy files.
@@ -92,7 +98,7 @@ function buildContext(
 /**
  * Parse and validate AI response.
  */
-function parseAIResponse(response: string): AIDecision {
+function parseAIResponse(response: string, issueType: IssueType): AIDecision {
   // Try to extract JSON from the response
   const jsonMatch = response.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
@@ -112,16 +118,13 @@ function parseAIResponse(response: string): AIDecision {
     throw new Error(`Invalid decision value: ${parsed.decision}`);
   }
 
-  // Validate action values
-  const validActions = [
-    'retry_payment', 'block_card',           // decline
-    'approve_refund', 'deny_refund',         // refund_request
-    'accept_dispute', 'contest_dispute',     // dispute
-    'send_reminder', 'charge_late_fee',      // missed_installment
-    'escalate',                              // common
-  ];
-  if (!validActions.includes(parsed.action)) {
-    throw new Error(`Invalid action value: ${parsed.action}`);
+  // Validate action values using ACTION_TYPES_BY_ISSUE
+  const validActionsForType = ACTION_TYPES_BY_ISSUE[issueType];
+  if (!validActionsForType.includes(parsed.action)) {
+    throw new Error(
+      `Invalid action "${parsed.action}" for issue type "${issueType}". ` +
+        `Valid actions: ${validActionsForType.join(', ')}`
+    );
   }
 
   // Validate confidence range
@@ -161,8 +164,14 @@ export async function evaluateWithAI(
   // Build context
   const context = buildContext(issue, customer, transaction);
 
-  // Build prompt with policy content included
+  // Build prompt with policy content and shared guidelines
   const prompt = `${policy}
+
+${getGeneralGuidelines()}
+
+${getConfidenceGuidelines()}
+
+${getOutputFormat(issue.type as IssueType)}
 
 ## Issue Context
 
@@ -216,7 +225,7 @@ ${context}`;
     }
 
     // Parse and validate response
-    const decision = parseAIResponse(result);
+    const decision = parseAIResponse(result, issue.type as IssueType);
 
     log.info(
       {

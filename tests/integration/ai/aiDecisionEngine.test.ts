@@ -84,7 +84,7 @@ describe('AI Decision Engine', () => {
     it('should parse human_review decision correctly', async () => {
       setMockAIResponse(createMockAIResponse({
         decision: 'human_review',
-        action: 'approve_refund',
+        action: 'retry_payment',
         confidence: 75,
       }));
 
@@ -92,7 +92,7 @@ describe('AI Decision Engine', () => {
       const result = await evaluateWithAI(issue, testCustomer, testTransaction);
 
       expect(result.decision).toBe('human_review');
-      expect(result.action).toBe('approve_refund');
+      expect(result.action).toBe('retry_payment');
       expect(result.confidence).toBe(75);
     });
 
@@ -224,7 +224,7 @@ describe('AI Decision Engine', () => {
 
       const issue = await createTestIssue();
       await expect(evaluateWithAI(issue, testCustomer, testTransaction))
-        .rejects.toThrow('Invalid action value');
+        .rejects.toThrow('Invalid action');
     });
 
     it('should throw error for confidence < 0', async () => {
