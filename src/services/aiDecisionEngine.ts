@@ -4,7 +4,13 @@ import { join } from 'path';
 import { config } from '../config/index.js';
 import { logger } from '../lib/logger.js';
 import type { Issue, Customer, Transaction } from '../db/schema/index.js';
-import type { DecisionType } from '../db/schema/enums.js';
+import type { DecisionType, IssueType } from '../db/schema/enums.js';
+import {
+  ACTION_TYPES_BY_ISSUE,
+  getConfidenceGuidelines,
+  getGeneralGuidelines,
+  getOutputFormat,
+} from './policyTemplates.js';
 
 /**
  * Map issue types to their corresponding policy files.
@@ -90,9 +96,27 @@ function buildContext(
 }
 
 /**
+ * Determine decision routing based on confidence score.
+ * - 90-100: auto_resolve
+ * - 70-89: human_review
+ * - 0-69: escalate
+ */
+function determineDecision(
+  confidence: number
+): 'auto_resolve' | 'human_review' | 'escalate' {
+  if (confidence >= 90) {
+    return 'auto_resolve';
+  } else if (confidence >= 70) {
+    return 'human_review';
+  } else {
+    return 'escalate';
+  }
+}
+
+/**
  * Parse and validate AI response.
  */
-function parseAIResponse(response: string): AIDecision {
+function parseAIResponse(response: string, issueType: IssueType): AIDecision {
   // Try to extract JSON from the response
   const jsonMatch = response.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
@@ -101,27 +125,18 @@ function parseAIResponse(response: string): AIDecision {
 
   const parsed = JSON.parse(jsonMatch[0]);
 
-  // Validate required fields
-  if (!parsed.decision || !parsed.action || parsed.confidence === undefined) {
+  // Validate required fields (decision is now derived from confidence)
+  if (!parsed.action || parsed.confidence === undefined) {
     throw new Error('Missing required fields in AI response');
   }
 
-  // Validate decision values
-  const validDecisions = ['auto_resolve', 'human_review', 'escalate'];
-  if (!validDecisions.includes(parsed.decision)) {
-    throw new Error(`Invalid decision value: ${parsed.decision}`);
-  }
-
-  // Validate action values
-  const validActions = [
-    'retry_payment', 'block_card',           // decline
-    'approve_refund', 'deny_refund',         // refund_request
-    'accept_dispute', 'contest_dispute',     // dispute
-    'send_reminder', 'charge_late_fee',      // missed_installment
-    'escalate',                              // common
-  ];
-  if (!validActions.includes(parsed.action)) {
-    throw new Error(`Invalid action value: ${parsed.action}`);
+  // Validate action values using ACTION_TYPES_BY_ISSUE
+  const validActionsForType = ACTION_TYPES_BY_ISSUE[issueType];
+  if (!validActionsForType.includes(parsed.action)) {
+    throw new Error(
+      `Invalid action "${parsed.action}" for issue type "${issueType}". ` +
+        `Valid actions: ${validActionsForType.join(', ')}`
+    );
   }
 
   // Validate confidence range
@@ -129,8 +144,11 @@ function parseAIResponse(response: string): AIDecision {
     throw new Error(`Confidence must be 0-100, got: ${parsed.confidence}`);
   }
 
+  // Derive decision from confidence
+  const decision = determineDecision(parsed.confidence);
+
   return {
-    decision: parsed.decision,
+    decision,
     action: parsed.action as DecisionType,
     confidence: parsed.confidence,
     reasoning: parsed.reasoning || 'No reasoning provided',
@@ -161,8 +179,14 @@ export async function evaluateWithAI(
   // Build context
   const context = buildContext(issue, customer, transaction);
 
-  // Build prompt with policy content included
+  // Build prompt with policy content and shared guidelines
   const prompt = `${policy}
+
+${getGeneralGuidelines()}
+
+${getConfidenceGuidelines()}
+
+${getOutputFormat(issue.type as IssueType)}
 
 ## Issue Context
 
@@ -216,7 +240,7 @@ ${context}`;
     }
 
     // Parse and validate response
-    const decision = parseAIResponse(result);
+    const decision = parseAIResponse(result, issue.type as IssueType);
 
     log.info(
       {

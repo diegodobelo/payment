@@ -84,7 +84,7 @@ describe('AI Decision Engine', () => {
     it('should parse human_review decision correctly', async () => {
       setMockAIResponse(createMockAIResponse({
         decision: 'human_review',
-        action: 'approve_refund',
+        action: 'retry_payment',
         confidence: 75,
       }));
 
@@ -92,14 +92,13 @@ describe('AI Decision Engine', () => {
       const result = await evaluateWithAI(issue, testCustomer, testTransaction);
 
       expect(result.decision).toBe('human_review');
-      expect(result.action).toBe('approve_refund');
+      expect(result.action).toBe('retry_payment');
       expect(result.confidence).toBe(75);
     });
 
-    it('should parse escalate decision correctly', async () => {
+    it('should derive escalate decision from low confidence', async () => {
       setMockAIResponse(createMockAIResponse({
-        decision: 'escalate',
-        action: 'escalate',
+        action: 'retry_payment',
         confidence: 40,
       }));
 
@@ -107,7 +106,7 @@ describe('AI Decision Engine', () => {
       const result = await evaluateWithAI(issue, testCustomer, testTransaction);
 
       expect(result.decision).toBe('escalate');
-      expect(result.action).toBe('escalate');
+      expect(result.action).toBe('retry_payment');
       expect(result.confidence).toBe(40);
     });
 
@@ -140,7 +139,7 @@ describe('AI Decision Engine', () => {
     it('should handle JSON embedded in text', async () => {
       const jsonWithText = `Here is my analysis:
 
-        {"decision":"auto_resolve","action":"retry_payment","confidence":88,"reasoning":"Looks good","policyApplied":"test"}
+        {"action":"retry_payment","confidence":88,"reasoning":"Looks good","policyApplied":"test"}
 
         Let me know if you need more details.`;
 
@@ -149,7 +148,7 @@ describe('AI Decision Engine', () => {
       const issue = await createTestIssue();
       const result = await evaluateWithAI(issue, testCustomer, testTransaction);
 
-      expect(result.decision).toBe('auto_resolve');
+      expect(result.decision).toBe('human_review'); // Derived from confidence 88
       expect(result.action).toBe('retry_payment');
       expect(result.confidence).toBe(88);
     });
@@ -170,20 +169,21 @@ describe('AI Decision Engine', () => {
   });
 
   describe('AI Response Validation Errors', () => {
-    it('should throw error when response missing decision field', async () => {
+    it('should derive decision from confidence when decision field missing', async () => {
       setMockAIResponse(createMockAIResponseRaw(JSON.stringify({
         action: 'retry_payment',
         confidence: 85,
       })));
 
       const issue = await createTestIssue();
-      await expect(evaluateWithAI(issue, testCustomer, testTransaction))
-        .rejects.toThrow('Missing required fields');
+      const result = await evaluateWithAI(issue, testCustomer, testTransaction);
+
+      expect(result.decision).toBe('human_review'); // Derived from confidence 85
+      expect(result.action).toBe('retry_payment');
     });
 
     it('should throw error when response missing action field', async () => {
       setMockAIResponse(createMockAIResponseRaw(JSON.stringify({
-        decision: 'auto_resolve',
         confidence: 85,
       })));
 
@@ -194,25 +194,12 @@ describe('AI Decision Engine', () => {
 
     it('should throw error when response missing confidence field', async () => {
       setMockAIResponse(createMockAIResponseRaw(JSON.stringify({
-        decision: 'auto_resolve',
         action: 'retry_payment',
       })));
 
       const issue = await createTestIssue();
       await expect(evaluateWithAI(issue, testCustomer, testTransaction))
         .rejects.toThrow('Missing required fields');
-    });
-
-    it('should throw error for invalid decision value', async () => {
-      setMockAIResponse(createMockAIResponseRaw(JSON.stringify({
-        decision: 'invalid_decision',
-        action: 'retry_payment',
-        confidence: 85,
-      })));
-
-      const issue = await createTestIssue();
-      await expect(evaluateWithAI(issue, testCustomer, testTransaction))
-        .rejects.toThrow('Invalid decision value');
     });
 
     it('should throw error for invalid action value', async () => {
@@ -224,7 +211,7 @@ describe('AI Decision Engine', () => {
 
       const issue = await createTestIssue();
       await expect(evaluateWithAI(issue, testCustomer, testTransaction))
-        .rejects.toThrow('Invalid action value');
+        .rejects.toThrow('Invalid action');
     });
 
     it('should throw error for confidence < 0', async () => {

@@ -533,9 +533,9 @@ async function main(): Promise<void> {
   console.log('║                           Processing Results                              ║');
   console.log('╚═══════════════════════════════════════════════════════════════════════════╝\n');
 
-  console.log('┌────────────────────┬────────────────────┬───────────────┬────────────┬───────────────┐');
-  console.log('│ Issue ID           │ Type               │ Decision      │ Confidence │ Routing       │');
-  console.log('├────────────────────┼────────────────────┼───────────────┼────────────┼───────────────┤');
+  console.log('┌────────────────────┬────────────────────┬──────────────────┬────────────┬───────────────┐');
+  console.log('│ Issue ID           │ Type               │ Decision         │ Confidence │ Routing       │');
+  console.log('├────────────────────┼────────────────────┼──────────────────┼────────────┼───────────────┤');
 
   for (const r of results) {
     const decision = r.automated_decision?.decision ?? 'N/A';
@@ -548,11 +548,11 @@ async function main(): Promise<void> {
     );
 
     console.log(
-      `│ ${r.external_id.padEnd(18)} │ ${r.type.padEnd(18)} │ ${decision.padStart(13)} │ ${confidence.padStart(10)} │ ${routing.padEnd(13)} │`
+      `│ ${r.external_id.padEnd(18)} │ ${r.type.padEnd(18)} │ ${decision.padStart(16)} │ ${confidence.padStart(10)} │ ${routing.padEnd(13)} │`
     );
   }
 
-  console.log('└────────────────────┴────────────────────┴───────────────┴────────────┴───────────────┘');
+  console.log('└────────────────────┴────────────────────┴──────────────────┴────────────┴───────────────┘');
 
   // Summary
   const autoResolved = results.filter((r) => r.status === 'resolved').length;
