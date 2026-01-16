@@ -4,10 +4,10 @@ import type { IssueType } from '../db/schema/enums.js';
  * Action types allowed for each issue type.
  */
 export const ACTION_TYPES_BY_ISSUE: Record<IssueType, readonly string[]> = {
-  decline: ['retry_payment', 'block_card', 'escalate'],
-  dispute: ['accept_dispute', 'contest_dispute', 'escalate'],
-  refund_request: ['approve_refund', 'deny_refund', 'escalate'],
-  missed_installment: ['send_reminder', 'charge_late_fee', 'escalate'],
+  decline: ['retry_payment', 'block_card'],
+  dispute: ['accept_dispute', 'contest_dispute'],
+  refund_request: ['approve_refund', 'deny_refund'],
+  missed_installment: ['send_reminder', 'charge_late_fee'],
 } as const;
 
 /**
@@ -16,16 +16,19 @@ export const ACTION_TYPES_BY_ISSUE: Record<IssueType, readonly string[]> = {
 export function getConfidenceGuidelines(): string {
   return `## Confidence Guidelines
 
-Your confidence score determines how the issue is routed:
+Always check the "actions" in the output format to determine the confidence level.
+The "actions" are related to the issue type.
 
-| Confidence | Routing | When to Use |
-|------------|---------|-------------|
-| 90-100 | **Auto-resolve** - Decision executed immediately | Clear-cut cases matching policy exactly, low-risk customer, no edge cases |
-| 70-89 | **Human review** - Decision queued for approval | Good policy fit but some ambiguity, want human confirmation |
-| 0-69 | **Escalate** - Needs human decision | Unclear situation, conflicting factors, high-risk customer, or policy doesn't clearly apply |
+Your confidence score determines the decision in the output:
+
+| Confidence | When to Use |
+|------------|-------------|
+| 90-100 | Clear-cut cases matching policy exactly, low-risk customer, no edge cases |
+| 70-89 | Good policy fit but some ambiguity, want human confirmation |
+| 0-69 | Unclear situation, conflicting factors, high-risk customer, or policy doesn't clearly apply |
 
 Be calibrated:
-- Don't default to 85% for everything - vary your confidence based on the situation
+- Vary your confidence based on the situation and the issue context
 - High confidence (90+) requires: clear policy match AND low-risk customer AND no complicating factors
 - When in doubt, lower confidence is safer than higher`;
 }
@@ -58,7 +61,6 @@ Return ONLY valid JSON with no additional text:
 
 \`\`\`json
 {
-  "decision": "auto_resolve" | "human_review" | "escalate",
   "action": ${actionUnion},
   "confidence": <0-100>,
   "reasoning": "<detailed explanation of why this decision was made>",

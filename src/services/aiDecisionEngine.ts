@@ -96,6 +96,24 @@ function buildContext(
 }
 
 /**
+ * Determine decision routing based on confidence score.
+ * - 90-100: auto_resolve
+ * - 70-89: human_review
+ * - 0-69: escalate
+ */
+function determineDecision(
+  confidence: number
+): 'auto_resolve' | 'human_review' | 'escalate' {
+  if (confidence >= 90) {
+    return 'auto_resolve';
+  } else if (confidence >= 70) {
+    return 'human_review';
+  } else {
+    return 'escalate';
+  }
+}
+
+/**
  * Parse and validate AI response.
  */
 function parseAIResponse(response: string, issueType: IssueType): AIDecision {
@@ -107,15 +125,9 @@ function parseAIResponse(response: string, issueType: IssueType): AIDecision {
 
   const parsed = JSON.parse(jsonMatch[0]);
 
-  // Validate required fields
-  if (!parsed.decision || !parsed.action || parsed.confidence === undefined) {
+  // Validate required fields (decision is now derived from confidence)
+  if (!parsed.action || parsed.confidence === undefined) {
     throw new Error('Missing required fields in AI response');
-  }
-
-  // Validate decision values
-  const validDecisions = ['auto_resolve', 'human_review', 'escalate'];
-  if (!validDecisions.includes(parsed.decision)) {
-    throw new Error(`Invalid decision value: ${parsed.decision}`);
   }
 
   // Validate action values using ACTION_TYPES_BY_ISSUE
@@ -132,8 +144,11 @@ function parseAIResponse(response: string, issueType: IssueType): AIDecision {
     throw new Error(`Confidence must be 0-100, got: ${parsed.confidence}`);
   }
 
+  // Derive decision from confidence
+  const decision = determineDecision(parsed.confidence);
+
   return {
-    decision: parsed.decision,
+    decision,
     action: parsed.action as DecisionType,
     confidence: parsed.confidence,
     reasoning: parsed.reasoning || 'No reasoning provided',

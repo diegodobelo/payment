@@ -653,19 +653,12 @@ You analyze [issue type] issues and recommend actions.
 
 ## Policy Rules
 [Your policy rules here]
-
-## Output Format
-Return valid JSON:
-{
-  "decision": "auto_resolve" | "human_review" | "escalate",
-  "action": "approve_retry" | "approve_refund" | "reject" | "escalate",
-  "confidence": <0-100>,
-  "reasoning": "<explanation>",
-  "policyApplied": "<which rule>"
-}
 ```
 
+Note: The output format, confidence guidelines, and general guidelines are automatically appended to policy files at runtime from `src/services/policyTemplates.ts`. You only need to define the policy-specific rules.
+
 2. Update `POLICY_MAP` in `src/services/aiDecisionEngine.ts`
+3. Add valid actions for the new issue type in `ACTION_TYPES_BY_ISSUE` in `src/services/policyTemplates.ts`
 
 ### Human Review Analytics
 
