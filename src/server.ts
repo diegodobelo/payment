@@ -91,7 +91,7 @@ async function registerRoutes() {
 // Set error handler
 function setErrorHandler() {
   // Type assertion needed due to exactOptionalPropertyTypes
-  app.setErrorHandler(errorHandler as Parameters<typeof app.setErrorHandler>[0]);
+  app.setErrorHandler(errorHandler);
 }
 
 // Graceful shutdown
@@ -169,5 +169,3 @@ async function start() {
 }
 
 start();
-
-export { app };

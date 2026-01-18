@@ -1,11 +1,5 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 
-declare module 'fastify' {
-  interface FastifyRequest {
-    requestId: string;
-  }
-}
-
 /**
  * Hook to ensure request ID is available on the request object.
  * Fastify generates the ID, this hook makes it easily accessible.
