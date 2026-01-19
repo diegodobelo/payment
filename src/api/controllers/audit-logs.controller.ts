@@ -4,7 +4,11 @@ import {
   type ListAuditLogsQuery,
 } from '../schemas/index.js';
 import { ValidationError } from '../middleware/errorHandler.js';
-import { auditLogRepository } from '../../repositories/auditLogRepository.js';
+import {
+  auditLogRepository,
+  type AuditLogFilters,
+  type AuditLogPaginationOptions,
+} from '../../repositories/auditLogRepository.js';
 import type { AuditAction, AuditEntityType } from '../../db/schema/enums.js';
 
 /**
@@ -23,7 +27,7 @@ export async function listAuditLogs(
   const query = parseResult.data;
 
   // Build filters
-  const filters: Parameters<typeof auditLogRepository.findAll>[0] = {};
+  const filters: AuditLogFilters = {};
   if (query.entity_type) {
     filters.entityType = query.entity_type as AuditEntityType;
   }
@@ -38,7 +42,7 @@ export async function listAuditLogs(
   }
 
   // Build pagination options
-  const paginationOptions: Parameters<typeof auditLogRepository.findAll>[1] = {};
+  const paginationOptions: AuditLogPaginationOptions = {};
   if (query.page !== undefined) paginationOptions.page = query.page;
   if (query.limit !== undefined) paginationOptions.limit = query.limit;
 

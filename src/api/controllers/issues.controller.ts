@@ -15,7 +15,12 @@ import {
   UnprocessableError,
   ValidationError,
 } from '../middleware/errorHandler.js';
-import { issueRepository } from '../../repositories/issueRepository.js';
+import {
+  issueRepository,
+  type CreateIssueParams,
+  type IssueFilters,
+  type PaginationOptions,
+} from '../../repositories/issueRepository.js';
 import { customerRepository } from '../../repositories/customerRepository.js';
 import { transactionRepository } from '../../repositories/transactionRepository.js';
 import { statusHistoryRepository } from '../../repositories/statusHistoryRepository.js';
@@ -74,7 +79,7 @@ export async function createIssue(
   }
 
   // Build create params
-  const createParams: Parameters<typeof issueRepository.create>[0] = {
+  const createParams: CreateIssueParams = {
     externalId: generateExternalId(),
     type: body.type as IssueType,
     customerId: customer.id,
@@ -208,7 +213,7 @@ export async function listIssues(
   const query = parseResult.data;
 
   // Build filters
-  const filters: Parameters<typeof issueRepository.findAll>[0] = {};
+  const filters: IssueFilters = {};
   if (query.status) filters.status = query.status as IssueStatus;
   if (query.type) filters.type = query.type as IssueType;
   if (query.priority) filters.priority = query.priority as PriorityLevel;
@@ -234,7 +239,7 @@ export async function listIssues(
   }
 
   // Build pagination options
-  const paginationOptions: Parameters<typeof issueRepository.findAll>[1] = {};
+  const paginationOptions: PaginationOptions = {};
   if (query.page !== undefined) paginationOptions.page = query.page;
   if (query.limit !== undefined) paginationOptions.limit = query.limit;
   if (query.sort_by !== undefined) paginationOptions.sortBy = query.sort_by;

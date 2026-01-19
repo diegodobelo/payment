@@ -21,6 +21,15 @@ export interface CreateAuditLogParams {
   metadata?: AuditMetadata;
 }
 
+export interface LogPiiAccessParams {
+  entityType: AuditEntityType;
+  entityId: string;
+  actor: string;
+  piiFieldsAccessed: string[];
+  actorIp?: string;
+  requestId?: string;
+}
+
 /**
  * Create an audit log entry.
  * This is a write-only operation - audit logs are never updated or deleted.
@@ -43,14 +52,7 @@ export async function createAuditLog(params: CreateAuditLogParams): Promise<void
 /**
  * Log PII access for compliance tracking.
  */
-export async function logPiiAccess(params: {
-  entityType: AuditEntityType;
-  entityId: string;
-  actor: string;
-  piiFieldsAccessed: string[];
-  actorIp?: string;
-  requestId?: string;
-}): Promise<void> {
+export async function logPiiAccess(params: LogPiiAccessParams): Promise<void> {
   const auditParams: CreateAuditLogParams = {
     entityType: params.entityType,
     entityId: params.entityId,

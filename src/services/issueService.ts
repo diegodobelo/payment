@@ -1,10 +1,13 @@
 import { redis } from '../lib/redis.js';
 import { logger } from '../lib/logger.js';
-import { issueRepository } from '../repositories/issueRepository.js';
+import { issueRepository, type UpdateIssueParams } from '../repositories/issueRepository.js';
 import { customerRepository } from '../repositories/customerRepository.js';
 import { transactionRepository } from '../repositories/transactionRepository.js';
 import { statusHistoryRepository } from '../repositories/statusHistoryRepository.js';
-import { decisionAnalyticsRepository } from '../repositories/decisionAnalyticsRepository.js';
+import {
+  decisionAnalyticsRepository,
+  type CreateAIDecisionParams,
+} from '../repositories/decisionAnalyticsRepository.js';
 import type { AuditContext } from '../repositories/customerRepository.js';
 import {
   evaluate,
@@ -151,7 +154,7 @@ export async function processIssue(
     const finalResolution = autoResolve ? getResolution(decision) : null;
 
     // Update issue with decision
-    const updateParams: Parameters<typeof issueRepository.update>[1] = {
+    const updateParams: UpdateIssueParams = {
       status: finalStatus,
       automatedDecision: decision.decision,
       automatedDecisionConfidence: decision.confidence.toFixed(2),
@@ -184,7 +187,7 @@ export async function processIssue(
 
     // Record AI decision in analytics if it needs human review (AI mode only)
     if (!autoResolve && decision.source === 'ai') {
-      const analyticsParams: Parameters<typeof decisionAnalyticsRepository.createAIDecision>[0] = {
+      const analyticsParams: CreateAIDecisionParams = {
         issueId,
         aiDecision: decision.aiRouting ?? 'human_review',
         aiAction: decision.decision,

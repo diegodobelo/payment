@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { customers, type Customer } from '../db/schema/index.js';
 import { decrypt } from '../lib/encryption.js';
-import { logPiiAccess } from './auditLogRepository.js';
+import { logPiiAccess, type LogPiiAccessParams } from './auditLogRepository.js';
 
 /**
  * Customer with decrypted PII fields.
@@ -51,7 +51,7 @@ export async function findById(
 
   // Log PII access when audit context is provided
   if (audit) {
-    const logParams: Parameters<typeof logPiiAccess>[0] = {
+    const logParams: LogPiiAccessParams = {
       entityType: 'customer',
       entityId: id,
       actor: audit.actor,
@@ -86,7 +86,7 @@ export async function findByExternalId(
 
   // Log PII access when audit context is provided
   if (audit) {
-    const logParams: Parameters<typeof logPiiAccess>[0] = {
+    const logParams: LogPiiAccessParams = {
       entityType: 'customer',
       entityId: customer.id,
       actor: audit.actor,

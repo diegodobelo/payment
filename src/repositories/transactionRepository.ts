@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { transactions, type Transaction } from '../db/schema/index.js';
 import { decrypt } from '../lib/encryption.js';
-import { logPiiAccess } from './auditLogRepository.js';
+import { logPiiAccess, type LogPiiAccessParams } from './auditLogRepository.js';
 import type { AuditContext } from './customerRepository.js';
 
 /**
@@ -30,8 +30,8 @@ function decryptTransaction(transaction: Transaction): DecryptedTransaction {
 function buildLogParams(
   entityId: string,
   audit: AuditContext
-): Parameters<typeof logPiiAccess>[0] {
-  const logParams: Parameters<typeof logPiiAccess>[0] = {
+): LogPiiAccessParams {
+  const logParams: LogPiiAccessParams = {
     entityType: 'transaction',
     entityId,
     actor: audit.actor,

@@ -4,7 +4,11 @@ import {
   type ListDecisionsQuery,
 } from '../schemas/index.js';
 import { ValidationError } from '../middleware/errorHandler.js';
-import { decisionAnalyticsRepository } from '../../repositories/decisionAnalyticsRepository.js';
+import {
+  decisionAnalyticsRepository,
+  type DecisionAnalyticsFilters,
+  type AnalyticsPaginationOptions,
+} from '../../repositories/decisionAnalyticsRepository.js';
 
 /**
  * Get AI decision agreement statistics.
@@ -43,7 +47,7 @@ export async function listDecisions(
   const query = parseResult.data;
 
   // Build filters
-  const filters: Parameters<typeof decisionAnalyticsRepository.findAll>[0] = {};
+  const filters: DecisionAnalyticsFilters = {};
   if (query.agreement) {
     if (query.agreement === 'pending') {
       filters.agreement = null;
@@ -56,7 +60,7 @@ export async function listDecisions(
   }
 
   // Build pagination options
-  const paginationOptions: Parameters<typeof decisionAnalyticsRepository.findAll>[1] = {};
+  const paginationOptions: AnalyticsPaginationOptions = {};
   if (query.page !== undefined) paginationOptions.page = query.page;
   if (query.limit !== undefined) paginationOptions.limit = query.limit;
 
