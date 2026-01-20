@@ -328,6 +328,12 @@ Each agent would return a weighted vote, and an arbiter would combine them for t
 
 11. **Single Source of Truth for Decision Types** — Decision types and actions are currently defined in multiple places: database enums (`src/db/schema/enums.ts`), AI policy files (`policies/*-policy.md`), web frontend types (`web/lib/types.ts`), and backend validation. Adding a new decision type requires updating all four locations. A better approach would be to expose an API endpoint (e.g., `/api/v1/config/decisions`) that returns valid options from the database enum, allowing the frontend and policy files to reference a single source of truth.
 
+12. **Strict CORS Configuration** — CORS is currently permissive (`origin: true`), allowing requests from any origin. Production deployments should configure allowed origins via environment variables (e.g., `CORS_ORIGINS=https://app.example.com`), with a strict default that blocks cross-origin requests when not explicitly configured.
+
+13. **AI Failure Alerting** — When the AI decision engine fails, the system silently falls back to local rules (`src/services/decisionEngineRouter.ts:69-73`). Administrators should be notified when this happens. A sliding window counter in Redis could track failures, and when a threshold is crossed (e.g., 3 failures in 1 minute), send an alert via webhook, Slack, or PagerDuty. This complements the circuit breaker (item 4) by ensuring operators are aware of AI degradation even when the system continues functioning.
+
+14. **Crash Recovery for Stuck Issues** — If a worker crashes after setting an issue to `processing` but before completing, the issue gets stuck forever. The current implementation only processes issues in `pending` status (`src/services/issueService.ts:108`), so BullMQ retries skip the stuck issue. A production fix could add a background job that finds issues in `processing` status for longer than the lock TTL (30 seconds) and resets them to `pending` for reprocessing.
+
 ## Local Development
 
 ### 1. Configure Environment
